@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Skill/tooling directories (untracked, bukan source SisaBaik):
+    ".agents/**",
+    ".roo/**",
   ]),
 ]);
 
