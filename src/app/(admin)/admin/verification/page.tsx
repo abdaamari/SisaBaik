@@ -1,32 +1,57 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { PageHeader } from "@/components/ui/page-header";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
+
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { Loader2, ShieldCheck, Building2, Check } from "lucide-react";
-type P = { id: string; organization_name: string; organization_type: string | null; phone: string | null; address: string | null; created_at: string; };
+import { Building2, Calendar, Check, Loader2, MapPin, Phone, RefreshCw, Search, ShieldCheck } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageLoader } from "@/components/ui/page-loader";
+import { formatDate } from "@/lib/format";
+
+type PendingPartner = {
+  id: string;
+  organization_name: string;
+  organization_type: string | null;
+  phone: string | null;
+  address: string | null;
+  created_at: string;
+};
+
 export default function AdminVerificationPage() {
-  const [rows, setRows] = useState<P[]>([]);
+  const [rows, setRows] = useState<PendingPartner[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-  const supabase = createClient();
-  const fetchRows = useCallback(async (): Promise<P[] | null> => {
-    const { data, error } = await supabase.from("profiles").select("id, organization_name, organization_type, phone, address, created_at").eq("role","partner").eq("is_verified",false).order("created_at",{ascending:false});
+  const [search, setSearch] = useState("");
+  const [target, setTarget] = useState<PendingPartner | null>(null);
+  const supabase = useMemo(() => createClient(), []);
+
+  const fetchRows = useCallback(async (): Promise<PendingPartner[] | null> => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, organization_name, organization_type, phone, address, created_at")
+      .eq("role", "partner")
+      .eq("is_verified", false)
+      .order("created_at", { ascending: false });
     if (error) {
       toast.error("Gagal memuat mitra");
       return null;
     }
-    return (data as P[]) ?? [];
+    return (data as PendingPartner[]) ?? [];
   }, [supabase]);
-  const load = useCallback(async () => {
-    setLoading(true);
+
+  const reload = useCallback(async () => {
+    setRefreshing(true);
     const nextRows = await fetchRows();
     if (nextRows) setRows(nextRows);
-    setLoading(false);
+    setRefreshing(false);
   }, [fetchRows]);
+
   useEffect(() => {
     let active = true;
     void fetchRows().then((nextRows) => {
@@ -34,36 +59,166 @@ export default function AdminVerificationPage() {
       if (nextRows) setRows(nextRows);
       setLoading(false);
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [fetchRows]);
-  const verify = async (id: string) => {
+
+  const verify = async () => {
+    if (!target) return;
+    const { id } = target;
     setBusy(id);
     const { data, error } = await supabase.rpc("verify_profile", { p_profile_id: id, p_verified: true } as never);
-    if (error) toast.error(error.message);
-    else {
-      const r = data as unknown as { success: boolean; error?: string };
-      if (r && r.success === false) toast.error(r.error || "Gagal");
-      else { toast.success("Mitra terverifikasi"); setRows((v) => v.filter((x) => x.id !== id)); }
+    if (error) {
+      toast.error(error.message);
+    } else {
+      const result = data as unknown as { success: boolean; error?: string };
+      if (result && result.success === false) {
+        toast.error(result.error || "Gagal");
+      } else {
+        toast.success("Mitra terverifikasi");
+        setRows((current) => current.filter((row) => row.id !== id));
+        setTarget(null);
+      }
     }
     setBusy(null);
   };
+
+  const visible = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return rows;
+    return rows.filter(
+      (row) =>
+        row.organization_name.toLowerCase().includes(term) ||
+        (row.organization_type ?? "").toLowerCase().includes(term) ||
+        (row.address ?? "").toLowerCase().includes(term),
+    );
+  }, [rows, search]);
+
+  if (loading) {
+    return <PageLoader variant="list" label="Memuat daftar mitra" />;
+  }
+
   return (
-    <div className="space-y-6">
-      <PageHeader title="Verifikasi Mitra" description="Hanya admin via RPC verify_profile (SECURITY DEFINER). RLS mencegah update langsung is_verified." action={<Button variant="outline" size="sm" onClick={load} disabled={loading}>{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}Muat Ulang</Button>} />
-      <Card><CardContent className="p-0">
-        {loading ? <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground"/></div> : rows.length === 0 ? <EmptyState icon={<ShieldCheck />} title="Tidak ada mitra menunggu" description="Semua mitra sudah terverifikasi."/> : (
-          <div className="overflow-x-auto"><table className="w-full"><thead><tr className="border-b bg-muted/30 text-left"><th className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Organisasi</th><th className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tipe</th><th className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Daftar</th><th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Aksi</th></tr></thead><tbody>
-            {rows.map((p) => (
-              <tr key={p.id} className="border-b last:border-0 hover:bg-muted/20">
-                <td className="px-6 py-4"><div className="flex items-center gap-3"><div className="h-9 w-9 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center"><Building2 className="h-4 w-4 text-amber-700"/></div><div><div className="font-medium">{p.organization_name}</div><div className="text-xs text-muted-foreground truncate max-w-[28ch]">{p.address ?? "-"}</div></div></div></td>
-                <td className="px-6 py-4 text-sm text-muted-foreground">{p.organization_type ?? "-"}</td>
-                <td className="px-6 py-4 text-sm text-muted-foreground">{new Date(p.created_at).toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"})}</td>
-                <td className="px-6 py-4 text-right"><Button size="sm" onClick={() => verify(p.id)} disabled={busy===p.id}>{busy===p.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Check className="mr-1.5 h-4 w-4"/>}Verifikasi</Button></td>
-              </tr>
-            ))}
-          </tbody></table></div>
-        )}
-      </CardContent></Card>
+    <div>
+      <PageHeader
+        title="Verifikasi mitra"
+        description="Mitra penyalur baru perlu disetujui sebelum bisa mengklaim donasi. Periksa data mereka, lalu verifikasi."
+        action={
+          <Button variant="outline" size="lg" onClick={() => void reload()} disabled={refreshing}>
+            {refreshing ? <Loader2 className="animate-spin" aria-hidden="true" /> : <RefreshCw aria-hidden="true" />}
+            Muat ulang
+          </Button>
+        }
+      />
+
+      {rows.length === 0 ? (
+        <EmptyState
+          icon={<ShieldCheck className="size-6" />}
+          title="Tidak ada mitra yang menunggu"
+          description="Semua mitra yang mendaftar sudah terverifikasi. Mitra baru akan muncul di sini."
+        />
+      ) : (
+        <div className="space-y-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative sm:w-80">
+              <Search
+                className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <Input
+                type="search"
+                aria-label="Cari mitra"
+                placeholder="Cari nama, jenis, atau alamat"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground" aria-live="polite">
+              <span className="font-semibold text-foreground tabular-nums">{visible.length}</span> mitra menunggu
+              verifikasi
+            </p>
+          </div>
+
+          {visible.length === 0 ? (
+            <EmptyState
+              icon={<Search className="size-6" />}
+              title="Tidak ada yang cocok"
+              description="Coba kata kunci lain."
+              action={
+                <Button variant="outline" onClick={() => setSearch("")}>
+                  Hapus pencarian
+                </Button>
+              }
+            />
+          ) : (
+            <ul className="grid gap-4 lg:grid-cols-2">
+              {visible.map((p) => (
+                <li key={p.id}>
+                  <Card className="h-full">
+                    <CardContent className="flex h-full flex-col gap-4">
+                      <div className="flex items-start gap-3">
+                        <span
+                          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-soon-soft text-soon-ink"
+                          aria-hidden="true"
+                        >
+                          <Building2 className="size-5" />
+                        </span>
+                        <div className="min-w-0">
+                          <h2 className="truncate font-heading text-lg font-bold">{p.organization_name}</h2>
+                          <p className="text-sm text-muted-foreground">{p.organization_type ?? "Jenis tidak diisi"}</p>
+                        </div>
+                      </div>
+
+                      <dl className="space-y-2 text-sm text-muted-foreground">
+                        <div className="flex items-start gap-2">
+                          <dt className="sr-only">Alamat</dt>
+                          <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                          <dd>{p.address ?? "Alamat tidak diisi"}</dd>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <dt className="sr-only">Telepon</dt>
+                          <Phone className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                          <dd>{p.phone || "Telepon tidak diisi"}</dd>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <dt className="sr-only">Mendaftar</dt>
+                          <Calendar className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                          <dd>Mendaftar {formatDate(p.created_at)}</dd>
+                        </div>
+                      </dl>
+
+                      <div className="mt-auto pt-2">
+                        <Button className="w-full" disabled={busy === p.id} onClick={() => setTarget(p)}>
+                          {busy === p.id ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Check aria-hidden="true" />}
+                          Verifikasi mitra
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={target !== null}
+        onOpenChange={(open) => {
+          if (!open) setTarget(null);
+        }}
+        title="Verifikasi mitra ini?"
+        description={
+          target
+            ? `${target.organization_name} akan bisa mengklaim donasi segera setelah diverifikasi.`
+            : undefined
+        }
+        confirmLabel="Verifikasi mitra"
+        loading={busy !== null}
+        onConfirm={verify}
+      />
     </div>
   );
 }
