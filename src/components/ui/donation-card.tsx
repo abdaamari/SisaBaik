@@ -1,107 +1,143 @@
-import { useRouter } from 'next/navigation';
+"use client";
+
+import Link from 'next/link';
+import { Clock, Cookie, CupSoda, Leaf, Loader2, MapPin, Package, Utensils } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatShortDateTime } from '@/lib/format';
+import { Button, buttonVariants } from './button';
+import { FreshnessMeter } from './freshness-meter';
 import { StatusBadge } from './status-badge';
 
+/** Picks a glyph for a donation category. Unknown categories fall back to a box. */
+export function CategoryIcon({ category, className }: { category: string; className?: string }) {
+  const name = category.toLowerCase();
+  const Icon =
+    name.includes('roti') || name.includes('kue')
+      ? Cookie
+      : name.includes('minum')
+        ? CupSoda
+        : name.includes('buah') || name.includes('sayur')
+          ? Leaf
+          : name.includes('makanan')
+            ? Utensils
+            : Package;
+  return <Icon className={className} aria-hidden="true" />;
+}
+
 interface DonationCardProps {
-  id: string;
+  href: string;
   foodName: string;
   category: string;
   quantity: number;
   unit: string;
-  status: 'available' | 'claimed' | 'delivered' | 'cancelled';
-  providerName: string;
-  expiryTime?: string;
+  /** Shown under the title. Leave out on a provider's own list, where the category is shown instead. */
+  providerName?: string;
+  expiryTime: string;
+  address?: string;
+  description?: string | null;
+  /** Adds a status badge, e.g. on a provider's own list where donations are in different stages. */
+  status?: string;
+  /** The live freshness meter only makes sense while the food can still be handed over. Defaults to true. */
+  showMeter?: boolean;
+  /** Shows a "Klaim donasi" button when provided. */
   onClaim?: () => void;
+  claiming?: boolean;
+  claimDisabled?: boolean;
+  /** Explains why claiming is disabled, e.g. an unverified account. */
+  claimHint?: string;
+  /** Any extra button, e.g. "Batalkan". Sits above the stretched link, so it stays clickable. */
+  extraAction?: React.ReactNode;
   className?: string;
 }
 
 export function DonationCard({
-  id,
+  href,
   foodName,
   category,
   quantity,
   unit,
-  status,
   providerName,
   expiryTime,
+  address,
+  description,
+  status,
+  showMeter = true,
   onClaim,
-  className
+  claiming = false,
+  claimDisabled = false,
+  claimHint,
+  extraAction,
+  className,
 }: DonationCardProps) {
-  const router = useRouter();
-
-  const getExpiryStatus = (expiryTime: string | undefined) => {
-    if (!expiryTime) return null;
-
-    const expiryDate = new Date(expiryTime);
-    const now = new Date();
-    const diffHours = (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-    if (diffHours <= 0) return 'expired';
-    if (diffHours <= 24) return 'expiring-soon';
-    return 'valid';
-  };
-
-  const expiryStatus = getExpiryStatus(expiryTime);
+  const hasExpiry = expiryTime !== '' && !Number.isNaN(new Date(expiryTime).getTime());
 
   return (
-    <div
+    <article
       className={cn(
-        "group flex w-full flex-col rounded-lg border border-border bg-card shadow-sm hover:shadow-md transition-shadow cursor-pointer",
-        className
+        'group relative flex flex-col gap-4 rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/50',
+        className,
       )}
-      onClick={() => router.push(`/donations/${id}`)}
     >
-      <div className="flex flex-col p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium text-foreground">{foodName}</h3>
+      <div className="flex items-start gap-3">
+        <span
+          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-fresh-soft text-fresh-ink"
+          title={category}
+        >
+          <CategoryIcon category={category} className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-base leading-snug font-bold text-foreground">
+            {/* The title link stretches over the whole card; real buttons sit above it with z-10. */}
+            <Link
+              href={href}
+              className="rounded-sm after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none focus-visible:after:ring-3 focus-visible:after:ring-ring/50"
+            >
+              {foodName}
+            </Link>
+          </h3>
+          <p className="mt-0.5 truncate text-sm text-muted-foreground">{providerName ?? category}</p>
+        </div>
+        <p className="shrink-0 text-right text-sm font-bold text-foreground tabular-nums">
+          {quantity} <span className="font-medium text-muted-foreground">{unit}</span>
+        </p>
+      </div>
+
+      {status && (
+        <div>
           <StatusBadge status={status} />
         </div>
+      )}
 
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">Kategori:</span>
-            <span className="font-medium">{category}</span>
-          </div>
+      {showMeter && hasExpiry ? (
+        <FreshnessMeter expiryTime={expiryTime} />
+      ) : hasExpiry ? (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Clock className="size-4 shrink-0" aria-hidden="true" />
+          Batas layak {formatShortDateTime(expiryTime)}
+        </p>
+      ) : null}
 
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">Jumlah:</span>
-            <span className="font-medium">{quantity} {unit}</span>
-          </div>
+      {address && (
+        <p className="flex items-start gap-2 text-sm text-muted-foreground">
+          <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span className="line-clamp-2">{address}</span>
+        </p>
+      )}
+      {description && <p className="line-clamp-2 text-sm leading-relaxed text-foreground/80">{description}</p>}
 
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">Dari:</span>
-            <span className="font-medium">{providerName}</span>
-          </div>
-
-          {expiryTime && (
-            <div className={cn(
-              "flex items-center gap-2 px-2 py-1 rounded",
-              expiryStatus === 'expired' && "bg-destructive/10 text-destructive",
-              expiryStatus === 'expiring-soon' && "bg-warning/10 text-warning",
-              expiryStatus === 'valid' && "bg-success/10 text-success"
-            )}
-            >
-              <span className="text-xs font-medium">
-                {expiryStatus === 'expired' ? 'Kadaluarsa' :
-                 expiryStatus === 'expiring-soon' ? 'Segera kadaluarsa' :
-                 'Masih berlaku'}
-              </span>
-            </div>
-          )}
-        </div>
-
+      <div className="relative z-10 mt-auto flex flex-wrap items-center gap-2 pt-1">
+        <Link href={href} className={cn(buttonVariants({ variant: 'outline' }), onClaim ? '' : 'flex-1')}>
+          Lihat detail
+        </Link>
         {onClaim && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onClaim();
-            }}
-            className="mt-2 w-full justify-center px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Klaim Donasi
-          </button>
+          <Button className="flex-1" disabled={claimDisabled || claiming} onClick={onClaim}>
+            {claiming && <Loader2 className="animate-spin" aria-hidden="true" />}
+            Klaim donasi
+          </Button>
         )}
+        {extraAction}
       </div>
-    </div>
+      {onClaim && claimHint && <p className="-mt-1 text-xs text-muted-foreground">{claimHint}</p>}
+    </article>
   );
 }

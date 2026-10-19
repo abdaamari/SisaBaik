@@ -1,53 +1,36 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { cn } from '@/lib/utils';
+import { Clock } from "lucide-react";
+import { useNow } from "@/hooks/use-now";
+import { cn } from "@/lib/utils";
+import { formatTimeLeft, freshnessTone, getFreshness } from "./freshness";
 
 interface ExpiryCountdownProps {
   expiryTime: string; // ISO string
   className?: string;
 }
 
+/** A small live pill: "2 jam 14 menit", tinted by urgency. */
 export function ExpiryCountdown({ expiryTime, className }: ExpiryCountdownProps) {
-  const [timeLeft, setTimeLeft] = useState(() => {
-    const expiryDate = new Date(expiryTime);
-    const now = new Date();
-    const diffMs = expiryDate.getTime() - now.getTime();
-    return Math.max(0, diffMs);
-  });
+  const now = useNow();
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const expiryDate = new Date(expiryTime);
-      const now = new Date();
-      const diffMs = expiryDate.getTime() - now.getTime();
-
-      if (diffMs <= 0) {
-        setTimeLeft(0);
-        clearInterval(interval);
-      } else {
-        setTimeLeft(diffMs);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [expiryTime]);
-
-  const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-  const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-  const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-
-  if (timeLeft <= 0) {
-    return (
-      <span className="px-2 py-1 text-xs bg-destructive/10 text-destructive rounded">
-        Kadaluarsa
-      </span>
-    );
+  if (!now) {
+    return <span aria-hidden="true" className={cn("inline-block h-6 w-28 rounded-full bg-muted", className)} />;
   }
 
+  const msLeft = new Date(expiryTime).getTime() - now;
+  const tone = freshnessTone[getFreshness(msLeft)];
+
   return (
-    <span className={cn("px-2 py-1 text-xs bg-warning/10 text-warning rounded", className)}>
-      {hours} jam {minutes} menit {seconds} detik
+    <span
+      className={cn(
+        "inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold tabular-nums",
+        tone.soft,
+        className,
+      )}
+    >
+      <Clock className="size-3" aria-hidden="true" />
+      {formatTimeLeft(msLeft, true)}
     </span>
   );
 }

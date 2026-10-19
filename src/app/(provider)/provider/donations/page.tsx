@@ -1,29 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { createClient } from "@/lib/supabase/client";
-import { toast } from "sonner";
-import {
-  Search,
-  Plus,
-  XCircle,
-  Package,
-} from "lucide-react";
+import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
+import { Package, Plus, Search } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { ChoiceChips } from "@/components/ui/choice-chips";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DonationCard } from "@/components/ui/donation-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageLoader } from "@/components/ui/page-loader";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { createClient } from "@/lib/supabase/client";
+import { DONATION_CATEGORIES } from "@/lib/donation-options";
+
+type DonationStatus = "available" | "claimed" | "delivered" | "cancelled";
+type StatusFilter = "all" | DonationStatus;
+type SortKey = "newest" | "urgent";
 
 interface Donation {
   id: string;
@@ -31,26 +27,45 @@ interface Donation {
   category: string;
   quantity: number;
   unit: string;
-  status: "available" | "claimed" | "delivered" | "cancelled";
+  status: DonationStatus;
   expiry_time: string;
   created_at: string;
+  pickup_address?: string;
+  description?: string | null;
 }
 
-export default function DonationsPage() {
+const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: "all", label: "Semua" },
+  { value: "available", label: "Tersedia" },
+  { value: "claimed", label: "Diklaim" },
+  { value: "delivered", label: "Disalurkan" },
+  { value: "cancelled", label: "Dibatalkan" },
+];
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "newest", label: "Terbaru" },
+  { value: "urgent", label: "Paling mendesak" },
+];
+
+// A sentinel that doubles as the visible label, so the select always shows readable text.
+const ALL_CATEGORIES = "Semua kategori";
+
+function parseStatus(value: string | null): StatusFilter {
+  return STATUS_OPTIONS.some((option) => option.value === value) ? (value as StatusFilter) : "all";
+}
+
+const stageRank = (status: DonationStatus) => (status === "available" ? 0 : status === "claimed" ? 1 : 2);
+
+function DonationsContent({ initialStatus }: { initialStatus: StatusFilter }) {
   const [donations, setDonations] = useState<Donation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatus);
+  const [categoryFilter, setCategoryFilter] = useState<string>(ALL_CATEGORIES);
+  const [sort, setSort] = useState<SortKey>("newest");
+  const [cancelTarget, setCancelTarget] = useState<Donation | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
   const supabase = useMemo(() => createClient(), []);
-
-  const categories = [
-    "Makanan Berat",
-    "Roti/Kue",
-    "Minuman",
-    "Buah/Sayur",
-    "Lainnya",
-  ];
 
   const fetchDonations = useCallback(async (isActive: () => boolean = () => true) => {
     try {
@@ -97,244 +112,213 @@ export default function DonationsPage() {
     };
   }, [fetchDonations]);
 
-  const filteredDonations = donations.filter((d) => {
-    const matchesSearch = d.food_name
-      .toLowerCase()
-      .includes(search.toLowerCase());
-    const matchesStatus = statusFilter === "all" || d.status === statusFilter;
-    const matchesCategory =
-      categoryFilter === "all" || d.category === categoryFilter;
-    return matchesSearch && matchesStatus && matchesCategory;
-  });
+  const counts = useMemo(() => {
+    const result: Record<StatusFilter, number> = { all: donations.length, available: 0, claimed: 0, delivered: 0, cancelled: 0 };
+    for (const donation of donations) result[donation.status] += 1;
+    return result;
+  }, [donations]);
 
-  const handleCancel = async (id: string) => {
-    if (!window.confirm("Yakin ingin membatalkan donasi ini?")) return;
+  const visible = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const filtered = donations.filter((d) => {
+      const matchesSearch = !term || d.food_name.toLowerCase().includes(term);
+      const matchesStatus = statusFilter === "all" || d.status === statusFilter;
+      const matchesCategory = categoryFilter === ALL_CATEGORIES || d.category === categoryFilter;
+      return matchesSearch && matchesStatus && matchesCategory;
+    });
+
+    return [...filtered].sort((a, b) =>
+      sort === "newest"
+        ? new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        : stageRank(a.status) - stageRank(b.status) ||
+          new Date(a.expiry_time).getTime() - new Date(b.expiry_time).getTime(),
+    );
+  }, [donations, search, statusFilter, categoryFilter, sort]);
+
+  const handleConfirmCancel = async () => {
+    if (!cancelTarget) return;
+    setIsCancelling(true);
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (supabase as any).rpc("cancel_donation", {
-        p_donation_id: id,
+        p_donation_id: cancelTarget.id,
       });
       if (error) throw error;
       toast.success("Donasi berhasil dibatalkan");
-      fetchDonations();
+      setCancelTarget(null);
+      void fetchDonations();
     } catch (error: unknown) {
       if (error instanceof Error) {
         toast.error(error.message || "Gagal membatalkan donasi");
       } else {
         toast.error("Gagal membatalkan donasi");
       }
+    } finally {
+      setIsCancelling(false);
     }
   };
 
+  const hasFilters = search.trim() !== "" || statusFilter !== "all" || categoryFilter !== ALL_CATEGORIES;
+
+  const resetFilters = () => {
+    setSearch("");
+    setStatusFilter("all");
+    setCategoryFilter(ALL_CATEGORIES);
+  };
+
   if (isLoading) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
-      </div>
-    );
+    return <PageLoader variant="list" label="Memuat donasi" />;
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="font-heading text-[28px] font-normal leading-none tracking-tight text-foreground">
-            Kelola Donasi
-          </h1>
-          <p className="mt-2 max-w-[60ch] text-sm leading-6 text-muted-foreground">
-            Lihat dan kelola semua donasi makanan Anda — pencarian dan filter
-            tetap di perangkat Anda, sumber data tetap milik Anda.
-          </p>
-        </div>
-        <Link href="/provider/donations/new">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Buat Donasi Baru
-          </Button>
-        </Link>
-      </div>
+    <div>
+      <PageHeader
+        title="Donasi saya"
+        description="Semua makanan yang pernah Anda catat, lengkap dengan sisa waktu dan tahapnya."
+        action={
+          <Link href="/provider/donations/new" className={buttonVariants({ size: "lg" })}>
+            <Plus aria-hidden="true" />
+            Buat donasi
+          </Link>
+        }
+      />
 
-      <Card className="rounded-2xl">
-        <CardContent className="p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+      {donations.length === 0 ? (
+        <EmptyState
+          title="Belum ada donasi"
+          description="Catat makanan berlebih pertama Anda. Mitra terverifikasi bisa langsung melihat dan mengklaimnya."
+          icon={<Package className="size-6" />}
+          action={
+            <Link href="/provider/donations/new" className={buttonVariants()}>
+              Buat donasi pertama
+            </Link>
+          }
+        />
+      ) : (
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="relative flex-1">
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden="true"
+                />
                 <Input
-                  placeholder="Cari nama makanan..."
+                  type="search"
+                  aria-label="Cari nama makanan"
+                  placeholder="Cari nama makanan"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-10"
                 />
               </div>
-            </div>
-            <div className="flex-1 sm:w-64">
-              <Select
-                value={statusFilter}
-                onValueChange={(value) => setStatusFilter(value ?? "all")}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Semua Status" />
+              <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value ?? ALL_CATEGORIES)}>
+                <SelectTrigger aria-label="Filter kategori" className="w-full sm:w-52">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Semua Status</SelectItem>
-                  <SelectItem value="available">Tersedia</SelectItem>
-                  <SelectItem value="claimed">Diklaim</SelectItem>
-                  <SelectItem value="delivered">Disalurkan</SelectItem>
-                  <SelectItem value="cancelled">Dibatalkan</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1 sm:w-64">
-              <Select
-                value={categoryFilter}
-                onValueChange={(value) => setCategoryFilter(value ?? "all")}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Semua Kategori" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Kategori</SelectItem>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
+                  <SelectItem value={ALL_CATEGORIES}>{ALL_CATEGORIES}</SelectItem>
+                  {DONATION_CATEGORIES.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card className="overflow-hidden rounded-2xl">
-        <CardContent className="p-0">
-          {filteredDonations.length === 0 ? (
-            <div className="py-14 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-muted text-muted-foreground">
-                <Package className="h-5 w-5" />
-              </div>
-              <h3 className="mt-4 font-heading text-[18px] text-foreground">
-                Tidak ada donasi
-              </h3>
-              <p className="mx-auto mt-1 max-w-[36ch] text-sm leading-6 text-muted-foreground">
-                Tidak ada donasi yang cocok dengan filter Anda. Sesuaikan
-                pencarian atau buat donasi baru.
-              </p>
-              <div className="mt-6">
-                <Link href="/provider/donations/new">
-                  <Button variant="outline" className="rounded-full">
-                    Buat Donasi Baru
-                  </Button>
-                </Link>
-              </div>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <ChoiceChips
+                label="Filter status"
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={STATUS_OPTIONS.map((option) => ({ ...option, count: counts[option.value] }))}
+              />
+              <ChoiceChips label="Urutkan" value={sort} onChange={setSort} options={SORT_OPTIONS} />
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-muted/20">
-                  <tr className="border-b border-border">
-                    <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                      Nama Makanan
-                    </th>
-                    <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                      Kategori
-                    </th>
-                    <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                      Jumlah
-                    </th>
-                    <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                      Batas Kelayakan
-                    </th>
-                    <th className="px-4 py-3 text-right text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                      Aksi
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredDonations.map((donation) => {
-                    const expiry = new Date(donation.expiry_time);
-                    const today = new Date();
-                    const diffDays = Math.ceil(
-                      (expiry.getTime() - today.getTime()) /
-                        (1000 * 60 * 60 * 24),
-                    );
-                    const isExpired = diffDays < 0;
+          </div>
 
-                    return (
-                      <tr
-                        key={donation.id}
-                        className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors"
-                      >
-                        <td className="px-4 py-3.5">
-                          <div className="font-medium text-foreground">
-                            {donation.food_name}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(donation.created_at).toLocaleDateString(
-                              "id-ID",
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5 text-sm text-muted-foreground">
-                          {donation.category}
-                        </td>
-                        <td className="px-4 py-3.5 text-sm tabular-nums">
-                          {donation.quantity} {donation.unit}
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <StatusBadge
-                            status={donation.status}
-                            type="donation"
-                          />
-                        </td>
-                        <td className="px-4 py-3.5 text-sm">
-                          <span
-                            className={`font-medium ${isExpired ? "text-destructive" : "text-muted-foreground"}`}
-                          >
-                            {isExpired
-                              ? "Kedaluwarsa"
-                              : `${diffDays} hari lagi`}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Link href={`/provider/donations/${donation.id}`}>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 w-8 rounded-full p-0"
-                              >
-                                <span className="sr-only">Lihat detail</span>
-                                <Package className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                            {donation.status === "available" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 w-8 rounded-full p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                onClick={() => handleCancel(donation.id)}
-                              >
-                                <span className="sr-only">Batalkan</span>
-                                <XCircle className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            Menampilkan <span className="font-semibold text-foreground tabular-nums">{visible.length}</span> dari{" "}
+            <span className="tabular-nums">{donations.length}</span> donasi
+          </p>
+
+          {visible.length === 0 ? (
+            <EmptyState
+              title="Tidak ada yang cocok"
+              description="Ubah kata kunci atau filter, atau tampilkan semua donasi."
+              icon={<Search className="size-6" />}
+              action={
+                hasFilters ? (
+                  <Button variant="outline" onClick={resetFilters}>
+                    Hapus filter
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {visible.map((donation) => (
+                <DonationCard
+                  key={donation.id}
+                  href={`/provider/donations/${donation.id}`}
+                  foodName={donation.food_name}
+                  category={donation.category}
+                  quantity={donation.quantity}
+                  unit={donation.unit}
+                  expiryTime={donation.expiry_time}
+                  address={donation.pickup_address}
+                  description={donation.description}
+                  status={donation.status}
+                  showMeter={donation.status === "available"}
+                  extraAction={
+                    donation.status === "available" ? (
+                      <Button variant="destructive" onClick={() => setCancelTarget(donation)}>
+                        Batalkan
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={cancelTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setCancelTarget(null);
+        }}
+        title="Batalkan donasi ini?"
+        description={
+          cancelTarget
+            ? `"${cancelTarget.food_name}" tidak akan lagi muncul di daftar mitra. Pembatalan tidak bisa diurungkan.`
+            : undefined
+        }
+        confirmLabel="Batalkan donasi"
+        cancelLabel="Jangan batalkan"
+        tone="danger"
+        loading={isCancelling}
+        onConfirm={handleConfirmCancel}
+      />
     </div>
+  );
+}
+
+// The status in the address (?status=claimed) picks the starting filter.
+// Keying by it remounts the list when the link changes, so the filter always matches the address.
+function DonationsRoute() {
+  const searchParams = useSearchParams();
+  const initialStatus = parseStatus(searchParams.get("status"));
+  return <DonationsContent key={initialStatus} initialStatus={initialStatus} />;
+}
+
+export default function DonationsPage() {
+  return (
+    <Suspense fallback={<PageLoader variant="list" label="Memuat donasi" />}>
+      <DonationsRoute />
+    </Suspense>
   );
 }

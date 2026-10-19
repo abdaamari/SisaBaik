@@ -1,23 +1,23 @@
 "use client";
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { toast } from 'sonner';
+import { Loader2, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { z } from 'zod';
+import { PasswordInput } from '@/components/ui/password-input';
+import { AuthShell } from '@/components/auth/auth-shell';
 import { createClient } from '@/lib/supabase/client';
-import { toast } from 'sonner';
-import { Loader2, Mail, Lock } from 'lucide-react';
 
 const loginSchema = z.object({
-  email: z.string().email('Email tidak valid'),
+  email: z.string().min(1, 'Email harus diisi').email('Format email belum benar'),
   password: z.string().min(1, 'Password harus diisi'),
-  rememberMe: z.boolean().optional(),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -45,13 +45,17 @@ export default function LoginPage() {
       });
 
       if (authError) {
-        toast.error(`Gagal masuk: ${authError.message}`);
+        toast.error(
+          authError.message === 'Invalid login credentials'
+            ? 'Email atau password salah. Periksa lagi lalu coba masuk.'
+            : `Gagal masuk: ${authError.message}`,
+        );
         return;
       }
 
       if (authData.user) {
         toast.success('Berhasil masuk!');
-        // After successful sign‑in, decide where to send the user based on their role.
+        // After successful sign-in, decide where to send the user based on their role.
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           const { data: profileData } = await supabase
@@ -72,7 +76,6 @@ export default function LoginPage() {
         } else {
           router.push('/');
         }
-
       } else {
         toast.error('Login gagal. Silakan coba lagi.');
       }
@@ -85,137 +88,67 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="container mx-auto px-4 py-12 md:py-24">
-        <div className="max-w-lg mx-auto">
-          <div className="text-center mb-12">
-            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground mb-4">
-              <span className="font-heading text-[14px] font-normal tracking-tight">S</span>
-            </div>
-            <h1 className="font-heading text-3xl md:text-4xl font-normal leading-tight tracking-tight mb-4">
-              Masuk ke SisaBaik
-            </h1>
-            <p className="text-muted-foreground text-lg max-w-xs mx-auto">
-              Masukkan email dan password Anda untuk mengakses akun dan mengelola donasi.
-            </p>
-          </div>
-
-          <Card>
-            <CardContent className="p-8 md:p-10 space-y-8">
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="font-medium">Email</FormLabel>
-                        <FormControl>
-                          <div className="flex items-center rounded-lg border input bg-card">
-                            <Mail className="h-4 w-4 text-muted-foreground ml-3" />
-                            <Input
-                              type="email"
-                              placeholder="nama@contoh.com"
-                              className="pl-3"
-                              {...field}
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+    <AuthShell
+      title="Selamat datang kembali"
+      description="Masuk untuk melanjutkan mengelola donasi makanan Anda."
+      footer={
+        <>
+          Belum punya akun?{' '}
+          <Link href="/register" className="font-bold text-primary underline-offset-4 hover:underline">
+            Daftar gratis
+          </Link>
+        </>
+      }
+    >
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <div className="relative">
+                  <Mail
+                    className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
                   />
-
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex items-center justify-between">
-                          <FormLabel className="font-medium">Password</FormLabel>
-                        </div>
-                        <FormControl>
-                          <div className="flex items-center rounded-lg border input bg-card">
-                            <Lock className="h-4 w-4 text-muted-foreground ml-3" />
-                            <Input
-                              type="password"
-                              placeholder="Masukkan password"
-                              className="pl-3"
-                              {...field}
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="flex items-center gap-3">
-                    <FormField
-                      control={form.control}
-                      name="rememberMe"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <Checkbox
-                              checked={!!field.value}
-                              onCheckedChange={field.onChange}
-                              className="h-4 w-4 text-primary"
-                            />
-                          </FormControl>
-                          <FormLabel className="text-sm text-muted-foreground ml-2 cursor-select-none">
-                            Ingatkan saya
-                          </FormLabel>
-                        </FormItem>
-                      )}
+                  <FormControl>
+                    <Input
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      placeholder="nama@contoh.com"
+                      className="pl-10"
+                      {...field}
                     />
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={isLoading}
-                  >
-                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Masuk Sekarang
-                  </Button>
-                </form>
-              </Form>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
+                  </FormControl>
                 </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">
-                    atau lanjutkan dengan
-                  </span>
-                </div>
-              </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-              <div className="grid grid-cols-2 gap-4">
-                <Button variant="outline" className="w-full">
-                  Google
-                </Button>
-              </div>
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <PasswordInput autoComplete="current-password" placeholder="Masukkan password" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-              <p className="text-center text-sm text-muted-foreground">
-                Belum punya akun?{' '}
-                <a href="/register" className="text-primary font-medium hover:underline">
-                  Daftar di sini
-                </a>
-              </p>
-            </CardContent>
-          </Card>
-
-          <p className="text-center text-xs text-muted-foreground mt-8">
-            Lupa password?{' '}
-            <a href="#" className="text-primary font-medium hover:underline">
-              Reset password
-            </a>
-          </p>
-        </div>
-      </div>
-    </main>
+          <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
+            {isLoading && <Loader2 className="animate-spin" aria-hidden="true" />}
+            {isLoading ? 'Sedang masuk...' : 'Masuk'}
+          </Button>
+        </form>
+      </Form>
+    </AuthShell>
   );
 }

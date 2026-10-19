@@ -1,23 +1,54 @@
 "use client";
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { toast } from 'sonner';
+import { ArrowLeft, ArrowRight, Check, Handshake, Loader2, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { ChoiceChips } from '@/components/ui/choice-chips';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AuthShell } from '@/components/auth/auth-shell';
 import { registerSchema, type RegisterFormData } from '@/lib/validations/auth';
 import { createClient } from '@/lib/supabase/client';
-import { toast } from 'sonner';
-import { Loader2, User, Building } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+type Role = 'provider' | 'partner';
+
+const ROLES: {
+  value: Role;
+  title: string;
+  text: string;
+  icon: React.ElementType;
+  types: string[];
+}[] = [
+  {
+    value: 'provider',
+    title: 'Penyedia makanan',
+    text: 'Punya makanan berlebih yang masih layak, dan ingin menyalurkannya.',
+    icon: Store,
+    types: ['Restoran', 'Katering', 'Toko Roti', 'Hotel', 'Kantin'],
+  },
+  {
+    value: 'partner',
+    title: 'Mitra penyalur',
+    text: 'Menjemput dan menyalurkan makanan ke orang yang membutuhkan.',
+    icon: Handshake,
+    types: ['LSM', 'Bank Makanan', 'Yayasan', 'Komunitas'],
+  },
+];
+
+const STEP_FIELDS = ['role', 'organization_name', 'organization_type', 'phone', 'address'] as const;
+const STEP_LABELS = ['Tentang organisasi', 'Akun Anda'];
 
 export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<'provider' | 'partner' | null>(null);
+  const [step, setStep] = useState<0 | 1>(0);
   const router = useRouter();
   const supabase = createClient();
 
@@ -33,6 +64,9 @@ export default function RegisterPage() {
       password: '',
     },
   });
+
+  const selectedRole = form.watch('role');
+  const roleConfig = ROLES.find((r) => r.value === selectedRole);
 
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true);
@@ -72,211 +106,233 @@ export default function RegisterPage() {
     }
   };
 
-  const handleRoleSelect = (role: 'provider' | 'partner') => {
-    setSelectedRole(role);
-    form.setValue('role', role);
+  const goNext = async () => {
+    const valid = await form.trigger([...STEP_FIELDS]);
+    if (valid) setStep(1);
+  };
+
+  // Enter on the first step moves forward instead of submitting a half-filled form.
+  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    if (step === 0) {
+      event.preventDefault();
+      void goNext();
+      return;
+    }
+    void form.handleSubmit(onSubmit)(event);
   };
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="container mx-auto px-4 py-12 md:py-24">
-        <div className="max-w-lg mx-auto">
-          <div className="text-center mb-12">
-            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground mb-4">
-              <span className="font-heading text-[14px] font-normal tracking-tight">S</span>
-            </div>
-            <h1 className="font-heading text-3xl md:text-4xl font-normal leading-tight tracking-tight mb-4">
-              Daftar Akun Baru
-            </h1>
-            <p className="text-muted-foreground text-lg max-w-xs mx-auto">
-              Bergabunglah dengan SisaBaik sebagai penyedia makanan atau mitra penyalur terverifikasi.
-            </p>
-          </div>
+    <AuthShell
+      title="Buat akun SisaBaik"
+      description="Gratis. Cukup dua langkah singkat."
+      footer={
+        <>
+          Sudah punya akun?{' '}
+          <Link href="/login" className="font-bold text-primary underline-offset-4 hover:underline">
+            Masuk
+          </Link>
+        </>
+      }
+    >
+      <div className="mb-6" aria-label={`Langkah ${step + 1} dari 2: ${STEP_LABELS[step]}`} role="group">
+        <div className="flex gap-1.5" aria-hidden="true">
+          {STEP_LABELS.map((label, index) => (
+            <span
+              key={label}
+              className={cn('h-1.5 flex-1 rounded-full transition-colors duration-300', index <= step ? 'bg-primary' : 'bg-muted')}
+            />
+          ))}
+        </div>
+        <p className="mt-2 text-sm font-semibold text-muted-foreground" aria-hidden="true">
+          Langkah {step + 1} dari 2 <span className="text-foreground">· {STEP_LABELS[step]}</span>
+        </p>
+      </div>
 
-          <Card>
-          <CardContent className="space-y-6">
-            {/* Role Selection */}
-            <div className="space-y-3">
-              <label className="text-sm font-medium">Pilih Peran Anda</label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Button
-                  type="button"
-                  variant={selectedRole === 'provider' ? 'default' : 'outline'}
-                  className="h-auto p-4 flex flex-col items-start gap-2"
-                  onClick={() => handleRoleSelect('provider')}
-                >
-                  <div className="flex items-center gap-2">
-                    <Building className="h-5 w-5 text-green-600" />
-                    <span className="font-semibold">Penyedia Makanan</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground text-left">
-                    Restoran, katering, toko roti, hotel, kantin yang memiliki surplus makanan
-                  </p>
-                </Button>
+      <Form {...form}>
+        <form onSubmit={handleFormSubmit} className="space-y-5" noValidate>
+          {step === 0 && (
+            <>
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <span className="text-sm leading-none font-medium select-none">Saya mendaftar sebagai</span>
+                    <div role="radiogroup" aria-label="Peran" className="grid gap-3 sm:grid-cols-2">
+                      {ROLES.map((role) => {
+                        const selected = field.value === role.value;
+                        return (
+                          <button
+                            key={role.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            onClick={() => {
+                              field.onChange(role.value);
+                              // The two roles offer different organization types.
+                              if (field.value !== role.value) form.setValue('organization_type', '');
+                            }}
+                            className={cn(
+                              'relative flex flex-col items-start gap-3 rounded-xl border-2 p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                              selected ? 'border-primary bg-fresh-soft' : 'border-border bg-card hover:border-primary/50',
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                'flex size-10 items-center justify-center rounded-full',
+                                selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground',
+                              )}
+                            >
+                              <role.icon className="size-5" aria-hidden="true" />
+                            </span>
+                            <span>
+                              <span className="block font-bold text-foreground">{role.title}</span>
+                              <span className="mt-1 block text-sm leading-snug text-muted-foreground">{role.text}</span>
+                            </span>
+                            {selected && (
+                              <span
+                                className="absolute top-3 right-3 flex size-6 animate-settle items-center justify-center rounded-full bg-primary text-primary-foreground"
+                                aria-hidden="true"
+                              >
+                                <Check className="size-3.5" />
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                <Button
-                  type="button"
-                  variant={selectedRole === 'partner' ? 'default' : 'outline'}
-                  className="h-auto p-4 flex flex-col items-start gap-2"
-                  onClick={() => handleRoleSelect('partner')}
-                >
-                  <div className="flex items-center gap-2">
-                    <User className="h-5 w-5 text-blue-600" />
-                    <span className="font-semibold">Mitra Penyalur</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground text-left">
-                    LSM, bank makanan, yayasan, komunitas yang menyalurkan makanan
-                  </p>
-                </Button>
-              </div>
-            </div>
+              <FormField
+                control={form.control}
+                name="organization_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nama organisasi</FormLabel>
+                    <FormControl>
+                      <Input autoComplete="organization" placeholder="Contoh: Resto Sejahtera" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                {/* Organization Name */}
-                <FormField
-                  control={form.control}
-                  name="organization_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nama Organisasi *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Contoh: Resto Sejahtera" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Organization Type */}
+              {roleConfig && (
                 <FormField
                   control={form.control}
                   name="organization_type"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Jenis Organisasi</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pilih jenis organisasi" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Restoran">Restoran</SelectItem>
-                          <SelectItem value="Katering">Katering</SelectItem>
-                          <SelectItem value="Toko Roti">Toko Roti</SelectItem>
-                          <SelectItem value="Hotel">Hotel</SelectItem>
-                          <SelectItem value="Kantin">Kantin</SelectItem>
-                          <SelectItem value="LSM">LSM</SelectItem>
-                          <SelectItem value="Bank Makanan">Bank Makanan</SelectItem>
-                          <SelectItem value="Yayasan">Yayasan</SelectItem>
-                          <SelectItem value="Komunitas">Komunitas</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <span className="text-sm leading-none font-medium select-none">
+                        Jenis organisasi <span className="font-normal text-muted-foreground">(opsional)</span>
+                      </span>
+                      <ChoiceChips
+                        label="Jenis organisasi"
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        options={roleConfig.types.map((type) => ({ value: type, label: type }))}
+                      />
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+              )}
 
-                {/* Phone */}
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nomor Telepon</FormLabel>
-                      <FormControl>
-                        <Input placeholder="+62 812-3456-7890" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Nomor telepon <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input type="tel" inputMode="tel" autoComplete="tel" placeholder="+62 812-3456-7890" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                {/* Address */}
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Alamat Lengkap *</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Jl. Contoh No. 123, Kota, Provinsi"
-                          className="resize-none"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Alamat lengkap</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        autoComplete="street-address"
+                        placeholder="Jl. Contoh No. 123, Kota, Provinsi"
+                        className="min-h-20 resize-none"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                {/* Email */}
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email *</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="email"
-                          placeholder="nama@contoh.com"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <Button type="button" size="lg" className="w-full" onClick={() => void goNext()}>
+                Lanjut
+                <ArrowRight aria-hidden="true" />
+              </Button>
+            </>
+          )}
 
-                {/* Password */}
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password *</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="Minimal 8 karakter"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+          {step === 1 && (
+            <>
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" inputMode="email" autoComplete="email" placeholder="nama@contoh.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-                {/* Submit Button */}
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={isLoading}
-                >
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Daftar Sekarang
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <PasswordInput autoComplete="new-password" placeholder="Minimal 8 karakter" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {selectedRole === 'partner' && (
+                <p className="rounded-xl bg-soon-soft px-4 py-3 text-sm leading-relaxed text-soon-ink">
+                  Mitra penyalur diverifikasi admin dulu sebelum bisa mengklaim donasi. Anda tetap bisa melihat donasi yang tersedia.
+                </p>
+              )}
+
+              <div className="flex gap-3">
+                <Button type="button" variant="outline" size="lg" disabled={isLoading} onClick={() => setStep(0)}>
+                  <ArrowLeft aria-hidden="true" />
+                  Kembali
                 </Button>
-              </form>
-            </Form>
-
-            <div className="text-center text-sm text-muted-foreground">
-              <p>
-                Sudah punya akun?{' '}
-                <a href="/login" className="text-green-600 hover:underline font-medium">
-                  Masuk di sini
-                </a>
-              </p>
-              <p className="mt-2">
-                Catatan: Mitra penyalur perlu diverifikasi oleh admin sebelum dapat mengklaim donasi.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-    </main>
+                <Button type="submit" size="lg" className="flex-1" disabled={isLoading}>
+                  {isLoading && <Loader2 className="animate-spin" aria-hidden="true" />}
+                  {isLoading ? 'Mendaftarkan...' : 'Buat akun'}
+                </Button>
+              </div>
+            </>
+          )}
+        </form>
+      </Form>
+    </AuthShell>
   );
 }
