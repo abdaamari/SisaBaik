@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, Check, Handshake, Loader2, Store } from 'lucide-react';
@@ -65,7 +65,7 @@ export default function RegisterPage() {
     },
   });
 
-  const selectedRole = form.watch('role');
+  const selectedRole = useWatch({ control: form.control, name: 'role' });
   const roleConfig = ROLES.find((r) => r.value === selectedRole);
 
   const onSubmit = async (data: RegisterFormData) => {
