@@ -145,7 +145,7 @@ export default function PartnerDashboardPage() {
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-12 pb-8 sm:space-y-14 sm:pb-10">
       <PageHeader
         title="Beranda"
         description="Donasi yang bisa Anda ambil, dan pesanan yang sedang berjalan."
@@ -176,7 +176,7 @@ export default function PartnerDashboardPage() {
           <h2 id="ringkasan" className="sr-only">
             Ringkasan
           </h2>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
             <StatCard
               title="Siap diklaim"
               value={dashboardData.availableDonations}
@@ -209,7 +209,7 @@ export default function PartnerDashboardPage() {
       )}
 
       <section aria-labelledby="terbaru">
-        <div className="mb-4 flex items-end justify-between gap-4">
+        <div className="mb-6 flex items-end justify-between gap-4">
           <h2 id="terbaru" className="font-heading text-2xl font-extrabold tracking-tight">
             Donasi terbaru
           </h2>
@@ -224,7 +224,7 @@ export default function PartnerDashboardPage() {
         </div>
 
         {recentDonations.length > 0 ? (
-          <ul className="space-y-4">
+          <ul className="space-y-5">
             {recentDonations.map((donation) => (
               <DonationRow
                 key={donation.id}
