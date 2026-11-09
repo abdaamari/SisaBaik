@@ -198,7 +198,7 @@ export default function ProviderDashboard() {
             }
           />
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-4">
             {recentDonations.map((donation) => (
               <DonationRow
                 key={donation.id}

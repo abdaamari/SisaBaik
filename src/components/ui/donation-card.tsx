@@ -74,7 +74,7 @@ export function DonationCard({
   return (
     <article
       className={cn(
-        'group relative flex flex-col gap-4 rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/50',
+        'group relative flex flex-col gap-5 rounded-xl border border-border bg-card p-6 transition-colors hover:border-primary/50',
         className,
       )}
     >
@@ -120,10 +120,10 @@ export function DonationCard({
       {address && (
         <p className="flex items-start gap-2 text-sm text-muted-foreground">
           <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span className="line-clamp-2">{address}</span>
+          <span>{address}</span>
         </p>
       )}
-      {description && <p className="line-clamp-2 text-sm leading-relaxed text-foreground/80">{description}</p>}
+      {description && <p className="text-sm leading-relaxed text-foreground/80">{description}</p>}
 
       <div className="relative z-10 mt-auto flex flex-wrap items-center gap-2 pt-1">
         <Link href={href} className={cn(buttonVariants({ variant: 'outline' }), onClaim ? '' : 'flex-1')}>

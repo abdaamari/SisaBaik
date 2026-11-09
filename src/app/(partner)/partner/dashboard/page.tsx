@@ -224,7 +224,7 @@ export default function PartnerDashboardPage() {
         </div>
 
         {recentDonations.length > 0 ? (
-          <ul className="space-y-3">
+          <ul className="space-y-4">
             {recentDonations.map((donation) => (
               <DonationRow
                 key={donation.id}
