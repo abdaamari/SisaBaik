@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PageLoader } from "@/components/ui/page-loader";
 import { StatCard } from "@/components/ui/stat-card";
 import { getProviderName, type ProfileRef } from "@/lib/format";
+import { checkAndSendExpiryAlerts } from "@/lib/expiry-alerts";
 
 interface PartnerDashboardData {
   availableDonations: number;
@@ -133,6 +134,9 @@ export default function PartnerDashboardPage() {
     } finally {
       setIsLoading(false);
     }
+
+    // Cek donasi yang akan kadaluwarsa dan kirim notifikasi
+    await checkAndSendExpiryAlerts();
   }, [supabase, router]);
 
   useEffect(() => {

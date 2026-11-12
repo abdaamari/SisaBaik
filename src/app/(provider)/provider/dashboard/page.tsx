@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { CheckCircle, Hand, Package, Plus, TrendingUp, XCircle } from "lucide-react";
+import { CheckCircle, Coins, Hand, Package, Plus, TrendingUp, XCircle } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { DonationRow } from "@/components/ui/donation-row";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PageLoader } from "@/components/ui/page-loader";
 import { StatCard } from "@/components/ui/stat-card";
 import { createClient } from "@/lib/supabase/client";
+import { checkAndSendExpiryAlerts } from "@/lib/expiry-alerts";
 
 interface DonationStats {
   total: number;
@@ -35,6 +36,10 @@ interface DonationStatusRow {
   status: "available" | "claimed" | "delivered" | "cancelled";
 }
 
+interface Profile {
+  points: number;
+}
+
 export default function ProviderDashboard() {
   const [stats, setStats] = useState<DonationStats>({
     total: 0,
@@ -44,6 +49,7 @@ export default function ProviderDashboard() {
     cancelled: 0,
   });
   const [recentDonations, setRecentDonations] = useState<RecentDonation[]>([]);
+  const [points, setPoints] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const supabase = useMemo(() => createClient(), []);
 
@@ -92,6 +98,20 @@ export default function ProviderDashboard() {
         if (isActive && recent) {
           setRecentDonations(recent as RecentDonation[]);
         }
+
+        // Fetch user profile points
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("points")
+          .eq("id", user.id)
+          .single() as { data: Profile | null };
+
+        if (isActive && profile) {
+          setPoints(profile.points);
+        }
+
+        // Cek donasi yang akan kadaluwarsa dan kirim notifikasi
+        await checkAndSendExpiryAlerts();
       } catch (error: unknown) {
         if (isActive) {
           toast.error("Gagal memuat data dashboard");
@@ -134,6 +154,14 @@ export default function ProviderDashboard() {
           Ringkasan
         </h2>
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+          <StatCard
+            title="Poin Anda"
+            value={points}
+            icon={<Coins className="size-4" />}
+            description="Tukarkan di Hadiah & Poin"
+            href="/provider/rewards"
+            className="col-span-2 md:col-span-1"
+          />
           <StatCard
             title="Semua donasi"
             value={stats.total}

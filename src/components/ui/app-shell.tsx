@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { LayoutDashboard, Loader2, LogOut, Package, Plus, ShieldCheck, ShoppingBag } from 'lucide-react';
+import { LayoutDashboard, Loader2, LogOut, Package, Plus, ShieldCheck, ShoppingBag, Users, Gift, Truck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { Logo } from './logo';
 import { ThemeToggle } from './theme-toggle';
+import { NotificationBell } from './notification-bell';
 
 type UserRole = 'provider' | 'partner' | 'admin';
 
@@ -37,6 +38,7 @@ const NAV_ITEMS: Record<UserRole, NavItem[]> = {
       isActive: (p) => startsWith('/provider/donations')(p) && !startsWith('/provider/donations/new')(p),
     },
     { href: '/provider/donations/new', label: 'Buat donasi', icon: Plus, isActive: startsWith('/provider/donations/new') },
+    { href: '/provider/rewards', label: 'Hadiah & Poin', icon: Gift, isActive: startsWith('/provider/rewards') },
   ],
   partner: [
     { href: '/partner/dashboard', label: 'Beranda', icon: LayoutDashboard, isActive: startsWith('/partner/dashboard') },
@@ -44,7 +46,13 @@ const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { href: '/partner/orders', label: 'Pesanan saya', icon: ShoppingBag, isActive: startsWith('/partner/orders') },
   ],
   admin: [
-    { href: '/admin/verification', label: 'Verifikasi mitra', icon: ShieldCheck, isActive: startsWith('/admin/verification') },
+    { href: '/admin/dashboard', label: 'Beranda', icon: LayoutDashboard, isActive: startsWith('/admin/dashboard') },
+    { href: '/admin/users', label: 'Pengguna', icon: Users, isActive: startsWith('/admin/users') },
+    { href: '/admin/donations', label: 'Donasi', icon: Package, isActive: startsWith('/admin/donations') },
+    { href: '/admin/orders', label: 'Pesanan', icon: ShoppingBag, isActive: startsWith('/admin/orders') },
+    { href: '/admin/rewards', label: 'Kelola Hadiah', icon: Gift, isActive: startsWith('/admin/rewards') },
+    { href: '/admin/reward-redemptions', label: 'Penukaran', icon: Truck, isActive: startsWith('/admin/reward-redemptions') },
+    { href: '/admin/verification', label: 'Verifikasi Mitra', icon: ShieldCheck, isActive: startsWith('/admin/verification') },
   ],
 };
 
@@ -58,7 +66,15 @@ export function AppShell({ children, userRole }: AppShellProps) {
   const pathname = usePathname() ?? '';
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const items = NAV_ITEMS[userRole];
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await createClient().auth.getUser();
+      setUserId(user?.id ?? null);
+    })();
+  }, []);
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -114,6 +130,12 @@ export function AppShell({ children, userRole }: AppShellProps) {
             );
           })}
         </nav>
+
+        {userId && (
+          <div className="px-3 py-2 border-b border-sidebar-border mb-2">
+            <NotificationBell userId={userId} className="w-full" />
+          </div>
+        )}
 
         <div className="space-y-2 border-t border-sidebar-border p-3">
           <div className="flex items-center justify-between gap-2 px-3 py-1">

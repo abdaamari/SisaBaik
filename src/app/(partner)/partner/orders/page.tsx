@@ -14,12 +14,16 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { FreshnessMeter } from "@/components/ui/freshness-meter";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoader } from "@/components/ui/page-loader";
+import { Pagination } from "@/components/ui/pagination";
+import { Reveal } from "@/components/ui/reveal";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StatusTimeline, getOrderTimeline } from "@/components/ui/status-timeline";
 import { formatDateTime, getProviderName, type ProfileRef } from "@/lib/format";
+import { checkAndSendExpiryAlerts } from "@/lib/expiry-alerts";
 
 interface OrderDonation {
   id: string;
+  provider_id: string;
   food_name: string;
   category: string;
   quantity: number;
@@ -39,6 +43,8 @@ interface OrderRow {
   donation_id: string;
   donations: OrderDonation | null;
 }
+
+const PAGE_SIZE = 10;
 
 type OrderAction = "in_transit" | "completed" | "cancelled";
 type StatusFilter = "all" | "pending" | "in_transit" | "completed" | "cancelled";
@@ -79,39 +85,57 @@ export default function PartnerOrdersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [pending, setPending] = useState<{ order: OrderRow; next: OrderAction } | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
-      const { data, error } = await supabase
+
+      const from = (page - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      const { data, error, count } = await supabase
         .from("orders")
-        .select("id, status, claimed_at, completed_at, donation_id, donations!inner(id, food_name, category, quantity, unit, status, expiry_time, pickup_address, description, profiles!donations_provider_id_fkey(organization_name))")
+        .select("id, status, claimed_at, completed_at, donation_id, donations!inner(id, provider_id, food_name, category, quantity, unit, status, expiry_time, pickup_address, description, profiles!donations_provider_id_fkey(organization_name))", { count: "exact" })
         .eq("partner_id", user.id)
-        .order("claimed_at", { ascending: false });
+        .order("claimed_at", { ascending: false })
+        .range(from, to);
       if (error) throw error;
+      setTotalCount(count ?? 0);
       setOrders((data as unknown as OrderRow[]) ?? []);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Gagal memuat pesanan";
       toast.error(msg);
     } finally { setIsLoading(false); }
-  }, [supabase, router]);
+
+    // Cek pesanan yang donasi-nya akan kadaluwarsa
+    await checkAndSendExpiryAlerts();
+  }, [supabase, router, page]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchOrders();
   }, [fetchOrders]);
 
+  // Reset ke halaman 1 saat filter berubah
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter]);
+
   const counts = useMemo(() => {
-    const result: Record<StatusFilter, number> = { all: orders.length, pending: 0, in_transit: 0, completed: 0, cancelled: 0 };
+    const result: Record<StatusFilter, number> = { all: totalCount, pending: 0, in_transit: 0, completed: 0, cancelled: 0 };
     for (const order of orders) {
       if (order.status in result) result[order.status as StatusFilter] += 1;
     }
     return result;
-  }, [orders]);
+  }, [orders, totalCount]);
 
   const handleUpdate = async () => {
     if (!pending) return;
@@ -121,6 +145,29 @@ export default function PartnerOrdersPage() {
       const { data, error } = await (supabase as unknown as { rpc: (n: string, a: Record<string, string>) => Promise<{ data: { success: boolean; error?: string }; error: unknown }> }).rpc("update_order_status", { p_order_id: order.id, p_new_status: next }) as { data: { success: boolean; error?: string } | null; error: unknown };
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error ?? "Gagal memperbarui status");
+
+      // Kirim notifikasi ke provider tentang perubahan status order
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && pending.order.donations) {
+        try {
+          const statusLabels: Record<string, string> = {
+            in_transit: "Dalam pengiriman",
+            completed: "Selesai",
+            cancelled: "Dibatalkan",
+          };
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase as any).from("notifications").insert({
+            user_id: pending.order.donations.provider_id,
+            type: "order_status_changed",
+            title: "Status pesanan berubah",
+            message: `Pesanan "${pending.order.donations.food_name}" sekarang berstatus ${statusLabels[next] ?? next}.`,
+            data: JSON.stringify({ order_id: pending.order.id, donation_id: pending.order.donation_id, new_status: next }),
+          });
+        } catch {
+          // Gagal kirim notifikasi tidak boleh gagalkan update status
+        }
+      }
+
       toast.success(next === "completed" ? "Pesanan selesai." : next === "cancelled" ? "Pesanan dibatalkan." : "Status diperbarui.");
       setPending(null);
       await fetchOrders();
@@ -138,17 +185,19 @@ export default function PartnerOrdersPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Pesanan saya"
-        description="Pantau tiap donasi yang Anda klaim, dari penjemputan sampai makanan sampai."
-        action={
-          <Link href="/partner/donations" className={buttonVariants({ variant: "outline", size: "lg" })}>
-            Cari donasi
-          </Link>
-        }
-      />
+      <Reveal delayIndex={0}>
+        <PageHeader
+          title="Pesanan saya"
+          description="Pantau tiap donasi yang Anda klaim, dari penjemputan sampai makanan sampai."
+          action={
+            <Link href="/partner/donations" className={buttonVariants({ variant: "outline", size: "lg" })}>
+              Cari donasi
+            </Link>
+          }
+        />
+      </Reveal>
 
-      {orders.length === 0 ? (
+      {totalCount === 0 ? (
         <EmptyState
           icon={<Truck className="size-6" />}
           title="Belum ada pesanan"
@@ -180,86 +229,89 @@ export default function PartnerOrdersPage() {
               }
             />
           ) : (
-            <ul className="grid gap-4">
-              {filtered.map((o) => {
-                const d = o.donations;
-                const isPending = o.status === "pending";
-                const isTransit = o.status === "in_transit";
-                const busy = updatingId === o.id;
-                return (
-                  <li key={o.id}>
-                    <Card>
-                      <CardContent className="space-y-5">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <h2 className="truncate font-heading text-xl font-bold">{d?.food_name ?? "Donasi"}</h2>
-                            <p className="mt-0.5 text-sm text-muted-foreground">
-                              {d ? getProviderName(d.profiles) : "Penyedia"}
-                              {d && (
-                                <>
-                                  {" "}
-                                  <span aria-hidden="true">·</span> {d.category}{" "}
-                                  <span aria-hidden="true">·</span>{" "}
-                                  <span className="tabular-nums">
-                                    {d.quantity} {d.unit}
-                                  </span>
-                                </>
-                              )}
-                            </p>
+            <>
+              <ul className="grid gap-4">
+                {filtered.map((o) => {
+                  const d = o.donations;
+                  const isPending = o.status === "pending";
+                  const isTransit = o.status === "in_transit";
+                  const busy = updatingId === o.id;
+                  return (
+                    <li key={o.id}>
+                      <Card>
+                        <CardContent className="space-y-5">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h2 className="truncate font-heading text-xl font-bold">{d?.food_name ?? "Donasi"}</h2>
+                              <p className="mt-0.5 text-sm text-muted-foreground">
+                                {d ? getProviderName(d.profiles) : "Penyedia"}
+                                {d && (
+                                  <>
+                                    {" "}
+                                    <span aria-hidden="true">·</span> {d.category}{" "}
+                                    <span aria-hidden="true">·</span>{" "}
+                                    <span className="tabular-nums">
+                                      {d.quantity} {d.unit}
+                                    </span>
+                                  </>
+                                )}
+                              </p>
+                            </div>
+                            <StatusBadge status={o.status} type="order" />
                           </div>
-                          <StatusBadge status={o.status} type="order" />
-                        </div>
 
-                        <StatusTimeline steps={getOrderTimeline(o.status)} orientation="horizontal" />
+                          <StatusTimeline steps={getOrderTimeline(o.status)} orientation="horizontal" />
 
-                        {d && (isPending || isTransit) && (
-                          <div className="rounded-xl bg-muted px-4 py-3">
-                            <FreshnessMeter expiryTime={d.expiry_time} />
+                          {d && (isPending || isTransit) && (
+                            <div className="rounded-xl bg-muted px-4 py-3">
+                              <FreshnessMeter expiryTime={d.expiry_time} />
+                            </div>
+                          )}
+
+                          <div className="space-y-1.5 text-sm text-muted-foreground">
+                            {d && (
+                              <p className="flex items-start gap-2">
+                                <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                                <span>{d.pickup_address}</span>
+                              </p>
+                            )}
+                            <p>Diklaim {formatDateTime(o.claimed_at)}</p>
+                            {o.completed_at && <p>Selesai {formatDateTime(o.completed_at)}</p>}
                           </div>
-                        )}
 
-                        <div className="space-y-1.5 text-sm text-muted-foreground">
-                          {d && (
-                            <p className="flex items-start gap-2">
-                              <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                              <span>{d.pickup_address}</span>
-                            </p>
-                          )}
-                          <p>Diklaim {formatDateTime(o.claimed_at)}</p>
-                          {o.completed_at && <p>Selesai {formatDateTime(o.completed_at)}</p>}
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
-                          {isPending && (
-                            <Button disabled={busy} onClick={() => setPending({ order: o, next: "in_transit" })}>
-                              <Truck aria-hidden="true" />
-                              Mulai pengiriman
-                            </Button>
-                          )}
-                          {isTransit && (
-                            <Button disabled={busy} onClick={() => setPending({ order: o, next: "completed" })}>
-                              <CheckCircle aria-hidden="true" />
-                              Tandai selesai
-                            </Button>
-                          )}
-                          {(isPending || isTransit) && (
-                            <Button variant="destructive" disabled={busy} onClick={() => setPending({ order: o, next: "cancelled" })}>
-                              <XCircle aria-hidden="true" />
-                              Batalkan
-                            </Button>
-                          )}
-                          {d && (
-                            <Link href={`/partner/donations/${d.id}`} className={buttonVariants({ variant: "ghost", className: "sm:ml-auto" })}>
-                              Lihat donasi
-                            </Link>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </li>
-                );
-              })}
-            </ul>
+                          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
+                            {isPending && (
+                              <Button disabled={busy} onClick={() => setPending({ order: o, next: "in_transit" })}>
+                                <Truck aria-hidden="true" />
+                                Mulai pengiriman
+                              </Button>
+                            )}
+                            {isTransit && (
+                              <Button disabled={busy} onClick={() => setPending({ order: o, next: "completed" })}>
+                                <CheckCircle aria-hidden="true" />
+                                Tandai selesai
+                              </Button>
+                            )}
+                            {(isPending || isTransit) && (
+                              <Button variant="destructive" disabled={busy} onClick={() => setPending({ order: o, next: "cancelled" })}>
+                                <XCircle aria-hidden="true" />
+                                Batalkan
+                              </Button>
+                            )}
+                            {d && (
+                              <Link href={`/partner/donations/${d.id}`} className={buttonVariants({ variant: "ghost", className: "sm:ml-auto" })}>
+                                Lihat donasi
+                              </Link>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </li>
+                  );
+                })}
+              </ul>
+              <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+            </>
           )}
         </div>
       )}

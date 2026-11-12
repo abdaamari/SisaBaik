@@ -133,6 +133,8 @@ export default function AdminVerificationClient() {
           <PageHeader
             title="Verifikasi mitra"
             description="Mitra penyalur baru perlu disetujui sebelum bisa mengklaim donasi. Periksa data mereka, lalu verifikasi."
+            backHref="/admin/dashboard"
+            backLabel="Kembali ke Beranda"
             action={
               <Button variant="outline" size="lg" onClick={() => void reload()} disabled={refreshing}>
                 Muat Ulang

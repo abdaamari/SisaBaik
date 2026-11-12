@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -13,13 +13,22 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { FreshnessMeter } from "@/components/ui/freshness-meter";
 import { InfoItem } from "@/components/ui/info-item";
 import { Notice } from "@/components/ui/notice";
+import { OptimizedImage } from "@/components/ui/image";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoader } from "@/components/ui/page-loader";
+import { Rating } from "@/components/ui/rating";
+import { ReviewForm } from "@/components/ui/review-form";
+import { ReviewList } from "@/components/ui/review-list";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import { formatDateTime, getProviderName, type ProfileRef } from "@/lib/format";
+
+// Import Leaflet CSS (diperlukan untuk tampilan peta)
+import "leaflet/dist/leaflet.css";
 
 interface PartnerDonationDetail {
   id: string;
+  provider_id: string;
   food_name: string;
   category: string;
   quantity: number;
@@ -28,6 +37,9 @@ interface PartnerDonationDetail {
   expiry_time: string;
   pickup_address: string;
   description: string | null;
+  image_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
   created_at: string;
   profiles: ProfileRef;
 }
@@ -43,6 +55,9 @@ function PartnerDonationDetailInner() {
   const [notFound, setNotFound] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [hasCompletedOrder, setHasCompletedOrder] = useState<boolean | null>(null);
+  const mapRef = useRef<any>(null);
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -51,14 +66,17 @@ function PartnerDonationDetailInner() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
+      setCurrentUserId(user.id);
       const { data: profile } = await supabase.from("profiles").select("is_verified").eq("id", user.id).single() as { data: { is_verified: boolean } | null };
       setIsVerified(profile ? !!profile.is_verified : false);
-      const { data, error } = await supabase.from("donations").select("id, food_name, category, quantity, unit, status, expiry_time, pickup_address, description, created_at, profiles!donations_provider_id_fkey(organization_name)").eq("id", id).single();
+      const { data, error } = await supabase.from("donations").select("id, provider_id, food_name, category, quantity, unit, status, expiry_time, pickup_address, description, image_url, latitude, longitude, created_at, profiles!donations_provider_id_fkey(organization_name)").eq("id", id).single();
       if (error || !data) { setNotFound(true); return; }
       const row = data as unknown as PartnerDonationDetail;
       if (row.status !== "available" || new Date(row.expiry_time) <= new Date()) {
-        const { data: order } = await supabase.from("orders").select("id").eq("donation_id", id).eq("partner_id", user.id).maybeSingle();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: order } = await (supabase as any).from("orders").select("id, status").eq("donation_id", id).eq("partner_id", user.id).maybeSingle();
         if (!order) { setNotFound(true); return; }
+        setHasCompletedOrder(order.status === "completed");
       }
       setDonation(row);
     } catch {
@@ -72,6 +90,13 @@ function PartnerDonationDetailInner() {
     void fetchDetail();
   }, [fetchDetail]);
 
+  // Invalidate ukuran peta Leaflet setelah dimuat agar marker tampil dengan benar
+  useEffect(() => {
+    if (mapRef.current && donation?.latitude !== null && donation?.longitude !== null) {
+      mapRef.current.invalidateSize();
+    }
+  }, [donation?.latitude, donation?.longitude]);
+
   const handleClaim = async () => {
     if (!donation || !isVerified) return;
     setClaiming(true);
@@ -79,6 +104,24 @@ function PartnerDonationDetailInner() {
       const { data, error } = await (supabase as unknown as { rpc: (n: string, a: Record<string, string>) => Promise<{ data: { success: boolean; error?: string }; error: unknown }> }).rpc("claim_donation", { p_donation_id: donation.id }) as { data: { success: boolean; error?: string } | null; error: unknown };
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error ?? "Gagal mengklaim");
+
+      // Kirim notifikasi ke provider pemilik donasi
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase as any).from("notifications").insert({
+            user_id: donation.provider_id,
+            type: "donation_claimed",
+            title: "Donasi Anda diklaim",
+            message: `"${donation.food_name}" telah diklaim oleh mitra. Silakan hubungi mitra untuk penjemputan.`,
+            data: JSON.stringify({ donation_id: donation.id, claimed_by: user.id }),
+          });
+        } catch {
+          // Gagal kirim notifikasi tidak boleh gagalkan klaim
+        }
+      }
+
       toast.success("Donasi berhasil diklaim!");
       setConfirmOpen(false);
       router.push("/partner/orders");
@@ -130,6 +173,69 @@ function PartnerDonationDetailInner() {
 
         <Card>
           <CardContent className="space-y-8">
+            {donation.image_url && (
+              <section aria-label="Foto donasi">
+                <p className="mb-2 text-sm font-semibold text-muted-foreground">Foto donasi</p>
+                <OptimizedImage
+                  src={donation.image_url}
+                  alt={donation.food_name}
+                  width={600}
+                  height={400}
+                  className="w-full h-48 object-cover rounded-xl border border-border bg-muted"
+                />
+              </section>
+            )}
+
+            {(donation.latitude !== null && donation.latitude !== undefined && donation.longitude !== null && donation.longitude !== undefined) && (
+              <section aria-label="Lokasi donasi">
+                <p className="mb-2 text-sm font-semibold text-muted-foreground">Lokasi pengambilan</p>
+                <MapContainer
+                  center={[donation.latitude!, donation.longitude!]}
+                  zoom={15}
+                  ref={mapRef}
+                  className="w-full h-64 rounded-xl border border-border"
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <Marker position={[donation.latitude!, donation.longitude!]}>
+                    <Popup>
+                      <span className="font-medium">{donation.food_name}</span>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {donation.pickup_address}
+                      </p>
+                    </Popup>
+                  </Marker>
+                </MapContainer>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const url = `https://www.google.com/maps/search/?api=1&query=${donation.latitude},${donation.longitude}`;
+                      window.open(url, "_blank");
+                    }}
+                  >
+                    <MapPin className="mr-2 size-4" aria-hidden="true" />
+                    Buka di Google Maps
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const url = `https://www.google.com/maps/dir/?api=1&destination=${donation.latitude},${donation.longitude}&travelmode=driving`;
+                      window.open(url, "_blank");
+                    }}
+                  >
+                    Arahkan rute
+                  </Button>
+                </div>
+              </section>
+            )}
+
             {donation.status === "available" && (
               <section aria-label="Sisa waktu">
                 <p className="mb-2 text-sm font-semibold text-muted-foreground">Sisa waktu layak konsumsi</p>
@@ -164,6 +270,19 @@ function PartnerDonationDetailInner() {
               <section aria-label="Deskripsi kondisi" className="rounded-xl bg-muted p-4">
                 <p className="text-xs font-semibold text-muted-foreground">Kondisi makanan</p>
                 <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap text-foreground">{donation.description}</p>
+              </section>
+            )}
+
+            {donation.status !== "available" && (
+              <section aria-label="Ulasan donasi">
+                <ReviewList donationId={donation.id} />
+                {currentUserId && hasCompletedOrder && (
+                  <ReviewForm
+                    donationId={donation.id}
+                    providerId={donation.provider_id}
+                    onSuccess={() => void fetchDetail()}
+                  />
+                )}
               </section>
             )}
 

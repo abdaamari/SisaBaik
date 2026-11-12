@@ -21,14 +21,14 @@ function StepDot({ status }: { status: TimelineStep['status'] }) {
       className={cn(
         'relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full',
         status === 'completed' && 'bg-primary text-primary-foreground',
-        status === 'current' && 'bg-soon text-[#13261e]',
+        status === 'current' && 'bg-fresh text-fresh-ink',
         status === 'pending' && 'bg-muted text-muted-foreground',
         status === 'failed' && 'bg-urgent text-white',
       )}
     >
       {status === 'completed' && <Check className="size-4" />}
       {status === 'failed' && <X className="size-4" />}
-      {status === 'current' && <span className="size-2.5 rounded-full bg-[#13261e]" />}
+      {status === 'current' && <span className="size-2.5 rounded-full bg-fresh-ink" />}
       {status === 'pending' && <span className="size-2 rounded-full bg-muted-foreground/50" />}
     </span>
   );

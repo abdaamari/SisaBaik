@@ -1,28 +1,45 @@
-import Link from 'next/link';
-import { ArrowRight, Hand, Package, Truck } from 'lucide-react';
-import { Logo } from '@/components/ui/logo';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
-import { buttonVariants } from '@/components/ui/button';
-import { LiveBoard } from '@/components/landing/live-board';
-import { RoleTabs } from '@/components/landing/role-tabs';
-import { cn } from '@/lib/utils';
+import Link from "next/link";
+import { ArrowRight, Hand, Package, Truck } from "lucide-react";
+import { Logo } from "@/components/ui/logo";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Reveal, RevealLines, LoopReveal } from "@/components/ui/reveal";
+import { LiveBoard } from "@/components/landing/live-board";
+
+const CONTAINER = "mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8";
+const SECTION_Y = "py-16 sm:py-20 lg:py-28";
 
 const STEPS = [
   {
     icon: Package,
-    title: 'Penyedia mencatat',
-    text: 'Restoran atau katering mengisi makanan yang tersisa, jumlahnya, dan batas waktu layak konsumsinya.',
+    title: "Penyedia mencatat",
+    text: "Restoran atau katering mengisi makanan yang tersisa, jumlahnya, dan batas waktu layak konsumsinya.",
   },
   {
     icon: Hand,
-    title: 'Mitra mengklaim',
-    text: 'Mitra penyalur terverifikasi memilih donasi yang bisa dijemput. Satu donasi hanya bisa diklaim satu mitra.',
+    title: "Mitra mengklaim",
+    text: "Mitra penyalur terverifikasi memilih donasi yang bisa dijemput. Satu donasi hanya bisa diklaim satu mitra.",
   },
   {
     icon: Truck,
-    title: 'Makanan sampai',
-    text: 'Mitra menjemput dan menyalurkannya. Setiap tahap tercatat, dari klaim sampai selesai.',
+    title: "Makanan sampai",
+    text: "Mitra menjemput dan menyalurkannya. Setiap tahap tercatat, dari klaim sampai selesai.",
   },
+];
+
+const GOALS = [
+  {
+    icon: Hand,
+    label: "SDG 12",
+    text: "Konsumsi dan produksi yang bertanggung jawab",
+  },
+  { icon: Package, label: "SDG 2", text: "Tanpa kelaparan" },
+];
+
+const SLOGANS = [
+  "SisaBaik — Jangan buang yang masih baik.",
+  "Dari dapur sampai ke penerima, sebelum waktu habis.",
 ];
 
 export default function LandingPage() {
@@ -30,19 +47,29 @@ export default function LandingPage() {
     <div className="min-h-screen bg-background text-foreground">
       <a
         href="#utama"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-full focus:bg-primary focus:px-5 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-primary-foreground"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-100 focus:rounded-full focus:bg-primary focus:px-5 focus:py-2.5 focus:text-sm focus:font-semibold focus:text-primary-foreground"
       >
         Lewati ke konten utama
       </a>
 
-      <header className="sticky top-0 z-50 bg-background/95">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Link href="/" aria-label="SisaBaik, ke beranda" className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
+      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
+        <div className={cn(CONTAINER, "flex h-16 items-center justify-between")}>
+          <Link
+            href="/"
+            aria-label="SisaBaik, ke beranda"
+            className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+          >
             <Logo />
           </Link>
-          <nav aria-label="Menu utama" className="flex items-center gap-1 sm:gap-2">
+          <nav
+            aria-label="Menu utama"
+            className="flex items-center gap-1 sm:gap-2"
+          >
             <ThemeToggle />
-            <Link href="/login" className={buttonVariants({ variant: 'ghost' })}>
+            <Link
+              href="/login"
+              className={buttonVariants({ variant: "ghost" })}
+            >
               Masuk
             </Link>
             <Link href="/register" className={buttonVariants()}>
@@ -53,118 +80,172 @@ export default function LandingPage() {
       </header>
 
       <main id="utama">
-        {/* Hero: the headline, and the thing it is about, side by side */}
-        <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 pt-8 pb-16 sm:px-6 md:pt-14 md:pb-24 lg:grid-cols-[1fr_minmax(0,28rem)] lg:gap-16">
-          <div className="animate-rise">
-            <h1 className="font-heading text-5xl leading-[1.05] font-extrabold tracking-tight sm:text-6xl lg:text-7xl">
-              Jangan buang yang masih baik.
-            </h1>
-            <p className="mt-6 max-w-[48ch] text-lg leading-relaxed text-foreground/80">
-              SisaBaik mempertemukan restoran, katering, dan toko roti yang punya makanan berlebih dengan mitra
-              penyalur terverifikasi, sebelum batas layak konsumsinya habis.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link href="/register" className={cn(buttonVariants({ size: 'lg' }), 'sm:w-auto')}>
-                Daftar gratis
-                <ArrowRight aria-hidden="true" />
-              </Link>
-              <Link href="/login" className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'sm:w-auto')}>
-                Masuk ke akun
-              </Link>
-            </div>
-          </div>
-
-          <div className="animate-rise [animation-delay:120ms]">
-            <LiveBoard />
-          </div>
-        </section>
-
-        {/* The three stages, as a field of colour */}
-        <section className="bg-primary text-primary-foreground">
-          <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 md:py-28">
-            <h2 className="max-w-[20ch] font-heading text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl">
-              Dari dapur sampai ke penerima.
-            </h2>
-            <ol className="mt-12 grid gap-10 md:grid-cols-3 md:gap-8">
-              {STEPS.map((step) => (
-                <li key={step.title}>
-                  <span className="flex size-12 items-center justify-center rounded-full bg-primary-foreground text-primary">
-                    <step.icon className="size-6" aria-hidden="true" />
-                  </span>
-                  <h3 className="mt-5 text-xl font-bold">{step.title}</h3>
-                  <p className="mt-2 max-w-[36ch] text-base leading-relaxed text-primary-foreground/90">{step.text}</p>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
-
-        {/* Roles */}
-        <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6 md:py-28">
-          <h2 className="max-w-[22ch] font-heading text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl">
-            Tugas Anda di SisaBaik.
-          </h2>
-          <p className="mt-4 max-w-[52ch] text-lg leading-relaxed text-foreground/80">
-            Setiap peran melihat menu dan halaman yang berbeda. Pilih peran untuk melihat apa yang bisa dikerjakan.
-          </p>
-          <div className="mt-10">
-            <RoleTabs />
-          </div>
-        </section>
-
-        {/* Why */}
-        <section className="bg-secondary">
-          <div className="mx-auto grid max-w-6xl gap-10 px-4 py-20 sm:px-6 md:py-28 lg:grid-cols-2 lg:gap-16">
+        {/* Hero: text left, image right on desktop; stacked on mobile */}
+        <section
+          className={cn(CONTAINER, "pt-12 pb-16 sm:pb-20 lg:pt-20 lg:pb-28")}
+        >
+          <div className="grid items-center gap-10 lg:grid-cols-[1fr_minmax(0,28rem)] lg:gap-16">
             <div>
-              <h2 className="max-w-[18ch] font-heading text-4xl leading-[1.1] font-extrabold tracking-tight sm:text-5xl">
-                Dua tujuan, satu piring.
-              </h2>
-              <p className="mt-4 max-w-[46ch] text-lg leading-relaxed text-foreground/80">
-                Makanan layak yang terbuang adalah dua masalah sekaligus. SisaBaik dibuat untuk menjawab keduanya.
-              </p>
+              <RevealLines delayIndex={0} className="space-y-1">
+                <div className="font-heading text-5xl leading-[1.05] font-extrabold tracking-tight text-foreground sm:text-6xl lg:text-7xl">
+                  Jangan buang
+                </div>
+                <div className="font-heading text-5xl leading-[1.05] font-extrabold tracking-tight text-foreground sm:text-6xl lg:text-7xl">
+                  yang masih baik.
+                </div>
+              </RevealLines>
+              <Reveal delayIndex={2}>
+                <p className="mt-6 max-w-[52ch] text-lg leading-relaxed text-foreground/70">
+                  SisaBaik mempertemukan restoran, katering, dan toko roti yang
+                  punya makanan berlebih dengan mitra penyalur terverifikasi,
+                  sebelum batas layak konsumsinya habis.
+                </p>
+              </Reveal>
+              <Reveal
+                delayIndex={4}
+                className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center"
+              >
+                <Link
+                  href="/register"
+                  className={cn(buttonVariants({ size: "lg" }), "sm:w-auto")}
+                >
+                  Daftar gratis
+                  <ArrowRight aria-hidden="true" />
+                </Link>
+                <Link
+                  href="/login"
+                  className={cn(
+                    buttonVariants({ variant: "ghost", size: "lg" }),
+                    "sm:w-auto",
+                  )}
+                >
+                  Saya sudah punya akun
+                </Link>
+              </Reveal>
             </div>
-            <dl className="space-y-8">
-              <div>
-                <dt className="text-xl font-bold">SDG 12: konsumsi dan produksi yang bertanggung jawab</dt>
-                <dd className="mt-2 max-w-[52ch] text-base leading-relaxed text-foreground/80">
-                  Makanan berlebih disalurkan, bukan dibuang. Limbah pangan berkurang sejak dari sumbernya.
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xl font-bold">SDG 2: tanpa kelaparan</dt>
-                <dd className="mt-2 max-w-[52ch] text-base leading-relaxed text-foreground/80">
-                  Makanan yang masih layak sampai ke orang yang membutuhkannya, lewat mitra yang sudah diverifikasi.
-                </dd>
-              </div>
-            </dl>
+
+            <Reveal delayIndex={6}>
+              <LiveBoard />
+            </Reveal>
           </div>
         </section>
 
-        {/* Close */}
-        <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6 md:py-28">
-          <h2 className="max-w-[16ch] font-heading text-5xl leading-[1.05] font-extrabold tracking-tight sm:text-6xl md:text-7xl">
-            Masih ada yang tersisa hari ini?
-          </h2>
-          <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-            <Link href="/register" className={cn(buttonVariants({ size: 'lg' }), 'sm:w-auto')}>
+        {/* The three steps */}
+        <section aria-labelledby="langkah" className={cn(CONTAINER, SECTION_Y)}>
+          <div className="flex items-center justify-between mb-12">
+            <h2 id="langkah" className="font-heading text-3xl font-extrabold leading-[1.1] tracking-tight text-foreground sm:text-4xl">
+              Langkah donasi
+            </h2>
+          </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            {STEPS.map((step, i) => (
+              <LoopReveal
+                key={step.title}
+                index={i}
+                className="card-hover h-full rounded-xl border border-border bg-card p-6 sm:p-8"
+              >
+                <div>
+                  <div className="mb-6 flex size-12 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <step.icon className="size-5" aria-hidden="true" />
+                  </div>
+                  <h3 className="mb-2 text-lg font-bold leading-snug">
+                    {step.title}
+                  </h3>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {step.text}
+                  </p>
+                </div>
+              </LoopReveal>
+            ))}
+          </div>
+        </section>
+
+        {/* SDG goals */}
+        <section className="bg-secondary">
+          <div className={cn(CONTAINER, SECTION_Y)}>
+            <div className="grid items-start gap-10 lg:grid-cols-2 lg:gap-24">
+              <div>
+                <h2 className="font-heading text-3xl font-extrabold leading-[1.1] tracking-tight sm:text-4xl">
+                  Dua tujuan, satu piring.
+                </h2>
+                <p className="mt-4 max-w-[46ch] text-lg leading-relaxed text-foreground/70">
+                  Makanan layak yang terbuang adalah dua masalah sekaligus.
+                  SisaBaik dibuat untuk menjawab keduanya.
+                </p>
+              </div>
+              <dl className="space-y-6">
+                {GOALS.map((goal, i) => (
+                  <LoopReveal key={goal.label} index={i + 10} className="flex items-start gap-4">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                      <goal.icon className="size-5" aria-hidden="true" />
+                    </div>
+                    <div>
+                      <dt className="text-sm font-bold">{goal.label}</dt>
+                      <dd className="text-sm text-foreground/80">
+                        {goal.text}
+                      </dd>
+                    </div>
+                  </LoopReveal>
+                ))}
+              </dl>
+            </div>
+          </div>
+        </section>
+
+        {/* Marquee: full-bleed band. bg-primary so the primary-foreground text is readable. */}
+        <section
+          aria-label="Slogan"
+          className="overflow-hidden bg-primary py-6"
+        >
+          <div className="marquee relative overflow-hidden">
+            <div className="marquee-track">
+              {[...SLOGANS, ...SLOGANS].map((text, i) => (
+                <span
+                  key={i}
+                  aria-hidden={i >= SLOGANS.length ? true : undefined}
+                  className="text-3xl font-bold tracking-tight text-primary-foreground sm:text-4xl"
+                >
+                  {text}
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Closing call to action, inside the container so it keeps its side padding */}
+        <section className={cn(CONTAINER, SECTION_Y)}>
+          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-4">
+            <Link
+              href="/register"
+              className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto")}
+            >
               Daftar gratis
               <ArrowRight aria-hidden="true" />
             </Link>
-            <Link href="/login" className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'sm:w-auto')}>
+            <Link
+              href="/login"
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "lg" }),
+                "w-full sm:w-auto",
+              )}
+            >
               Saya sudah punya akun
             </Link>
           </div>
         </section>
       </main>
 
-      <footer className="bg-foreground text-background">
-        <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-          <p className="font-heading text-5xl leading-none font-extrabold tracking-tight sm:text-7xl md:text-8xl">
-            SisaBaik
-          </p>
-          <p className="mt-6 text-sm text-background/80">
-            Platform redistribusi makanan berlebih untuk Indonesia. &copy; 2026 SisaBaik.
-          </p>
+      <footer className="border-t border-border bg-background/50">
+        <div className={cn(CONTAINER, "py-12")}>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+            <p className="font-heading text-2xl font-extrabold leading-none tracking-tight sm:text-3xl">
+              SisaBaik
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Platform redistribusi makanan berlebih untuk Indonesia. &copy;
+              2026 SisaBaik.
+            </p>
+          </div>
         </div>
       </footer>
     </div>

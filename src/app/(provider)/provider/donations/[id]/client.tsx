@@ -30,6 +30,7 @@ interface DonationDetail {
   expiry_time: string;
   pickup_address: string;
   description: string | null;
+  image_url: string | null;
   created_at: string;
   updated_at: string | null;
 }
@@ -62,7 +63,7 @@ function ProviderDonationDetailInner() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!isActive()) return;
       if (!user) { router.replace("/login"); return; }
-      const { data, error } = await supabase.from("donations").select("id, food_name, category, quantity, unit, status, expiry_time, pickup_address, description, created_at, updated_at").eq("id", id).eq("provider_id", user.id).single();
+      const { data, error } = await supabase.from("donations").select("id, food_name, category, quantity, unit, status, expiry_time, pickup_address, description, image_url, created_at, updated_at").eq("id", id).eq("provider_id", user.id).single();
       if (!isActive()) return;
       if (error || !data) { setNotFound(true); setDonation(null); return; }
       setDonation(data as DonationDetail);
@@ -155,6 +156,17 @@ function ProviderDonationDetailInner() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <Card>
           <CardContent className="space-y-8">
+            {donation.image_url && (
+              <section aria-label="Foto donasi">
+                <p className="mb-2 text-sm font-semibold text-muted-foreground">Foto donasi</p>
+                <img
+                  src={donation.image_url}
+                  alt={donation.food_name}
+                  className="w-full h-48 object-cover rounded-xl border border-border bg-muted"
+                />
+              </section>
+            )}
+
             {isLive ? (
               <section aria-label="Sisa waktu">
                 <p className="mb-2 text-sm font-semibold text-muted-foreground">Sisa waktu layak konsumsi</p>

@@ -19,6 +19,10 @@ export type Database = {
           expiry_time: string;
           pickup_address: string;
           description: string | null;
+          image_url: string | null;
+          latitude: number | null;
+          longitude: number | null;
+          expiry_notified_at: string | null;
           status: 'available' | 'claimed' | 'delivered' | 'cancelled';
           created_at: string;
           updated_at: string;
@@ -33,6 +37,10 @@ export type Database = {
           expiry_time: string;
           pickup_address: string;
           description?: string | null;
+          image_url?: string | null;
+          latitude?: number | null;
+          longitude?: number | null;
+          expiry_notified_at?: string | null;
           status?: 'available' | 'claimed' | 'delivered' | 'cancelled';
           created_at?: string;
           updated_at?: string;
@@ -47,6 +55,10 @@ export type Database = {
           expiry_time?: string;
           pickup_address?: string;
           description?: string | null;
+          image_url?: string | null;
+          latitude?: number | null;
+          longitude?: number | null;
+          expiry_notified_at?: string | null;
           status?: 'available' | 'claimed' | 'delivered' | 'cancelled';
           created_at?: string;
           updated_at?: string;
@@ -112,6 +124,7 @@ export type Database = {
           phone: string | null;
           address: string | null;
           is_verified: boolean;
+          points: number;
           created_at: string;
         };
         Insert: {
@@ -122,6 +135,7 @@ export type Database = {
           phone?: string | null;
           address?: string | null;
           is_verified?: boolean;
+          points?: number;
           created_at?: string;
         };
         Update: {
@@ -132,6 +146,7 @@ export type Database = {
           phone?: string | null;
           address?: string | null;
           is_verified?: boolean;
+          points?: number;
           created_at?: string;
         };
         Relationships: [
@@ -140,6 +155,218 @@ export type Database = {
             columns: ["id"],
             isOneToOne: true,
             referencedTable: "users",
+            referencedColumns: ["id"]
+          }
+        ];
+      };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: 'new_donation' | 'donation_claimed' | 'order_status_changed' | 'system';
+          title: string;
+          message: string | null;
+          data: string | null;
+          read: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: 'new_donation' | 'donation_claimed' | 'order_status_changed' | 'system';
+          title: string;
+          message?: string | null;
+          data?: string | null;
+          read?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: 'new_donation' | 'donation_claimed' | 'order_status_changed' | 'system';
+          title?: string;
+          message?: string | null;
+          data?: string | null;
+          read?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey",
+            columns: ["user_id"],
+            isOneToOne: false,
+            referencedTable: "users",
+            referencedColumns: ["id"]
+          }
+        ];
+      };
+      rewards: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          points_cost: number;
+          stock: number;
+          is_active: boolean;
+          image_url: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          points_cost: number;
+          stock?: number;
+          is_active?: boolean;
+          image_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          description?: string | null;
+          points_cost?: number;
+          stock?: number;
+          is_active?: boolean;
+          image_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      point_transactions: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: 'earned' | 'redeemed';
+          amount: number;
+          description: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: 'earned' | 'redeemed';
+          amount: number;
+          description?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: 'earned' | 'redeemed';
+          amount?: number;
+          description?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "point_transactions_user_id_fkey",
+            columns: ["user_id"],
+            isOneToOne: false,
+            referencedTable: "users",
+            referencedColumns: ["id"]
+          }
+        ];
+      };
+      reward_redemptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          reward_id: string;
+          points_spent: number;
+          status: 'pending' | 'fulfilled' | 'cancelled';
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          reward_id: string;
+          points_spent: number;
+          status?: 'pending' | 'fulfilled' | 'cancelled';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          reward_id?: string;
+          points_spent?: number;
+          status?: 'pending' | 'fulfilled' | 'cancelled';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reward_redemptions_user_id_fkey",
+            columns: ["user_id"],
+            isOneToOne: false,
+            referencedTable: "users",
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reward_redemptions_reward_id_fkey",
+            columns: ["reward_id"],
+            isOneToOne: false,
+            referencedTable: "rewards",
+            referencedColumns: ["id"]
+          }
+        ];
+      };
+      reviews: {
+        Row: {
+          id: string;
+          donation_id: string;
+          partner_id: string;
+          provider_id: string;
+          rating: number;
+          comment: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          donation_id: string;
+          partner_id: string;
+          provider_id: string;
+          rating: number;
+          comment?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          donation_id?: string;
+          partner_id?: string;
+          provider_id?: string;
+          rating?: number;
+          comment?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reviews_donation_id_fkey",
+            columns: ["donation_id"],
+            isOneToOne: false,
+            referencedTable: "donations",
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_partner_id_fkey",
+            columns: ["partner_id"],
+            isOneToOne: false,
+            referencedTable: "profiles",
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_provider_id_fkey",
+            columns: ["provider_id"],
+            isOneToOne: false,
+            referencedTable: "profiles",
             referencedColumns: ["id"]
           }
         ];
@@ -198,6 +425,14 @@ export type Database = {
           is_verified?: boolean;
           error?: string;
         };
+      };
+      add_points: {
+        _Args: {
+          p_user_id: string;
+          p_amount: number;
+          p_description: string;
+        };
+        _Returns: void;
       };
     };
     Enums: {

@@ -19,15 +19,19 @@ export const metadata: Metadata = {
 // Runs before first paint so the saved theme never flashes.
 const themeInitScript = `try{var t=localStorage.getItem('sisabaik-theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}}catch(e){}`;
 
+// Add .js class to <html> for CSS animations once JavaScript is available.
+const motionInitScript = `document.documentElement.classList.add('js');`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" suppressHydrationWarning>
+    <html lang="id" suppressHydrationWarning className="js">
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script dangerouslySetInnerHTML={{ __html: motionInitScript }} />
       </head>
       <body className={`${jakarta.variable} font-sans antialiased`}>
         <ToastProvider>

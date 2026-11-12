@@ -4,8 +4,10 @@ import Link from 'next/link';
 import { Clock, Cookie, CupSoda, Leaf, Loader2, MapPin, Package, Utensils } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatShortDateTime } from '@/lib/format';
+import { isExpiringSoon, hoursUntilExpiry } from '@/lib/expiry';
 import { Button, buttonVariants } from './button';
 import { FreshnessMeter } from './freshness-meter';
+import { OptimizedImage, DonationPlaceholder } from './image';
 import { StatusBadge } from './status-badge';
 
 /** Picks a glyph for a donation category. Unknown categories fall back to a box. */
@@ -35,6 +37,8 @@ interface DonationCardProps {
   expiryTime: string;
   address?: string;
   description?: string | null;
+  /** URL foto donasi (opsional). Ditampilkan di atas kartu jika tersedia. */
+  imageUrl?: string | null;
   /** Adds a status badge, e.g. on a provider's own list where donations are in different stages. */
   status?: string;
   /** The live freshness meter only makes sense while the food can still be handed over. Defaults to true. */
@@ -60,6 +64,7 @@ export function DonationCard({
   expiryTime,
   address,
   description,
+  imageUrl,
   status,
   showMeter = true,
   onClaim,
@@ -75,9 +80,26 @@ export function DonationCard({
     <article
       className={cn(
         'group relative flex flex-col gap-5 rounded-xl border border-border bg-card p-6 transition-colors hover:border-primary/50',
+        'card-hover',
         className,
       )}
     >
+      {imageUrl ? (
+        <div className="mb-3">
+          <OptimizedImage
+            src={imageUrl}
+            alt={foodName}
+            width={400}
+            height={200}
+            className="w-full h-32 object-cover rounded-xl border border-border bg-muted"
+          />
+        </div>
+      ) : (
+        <div className="mb-3">
+          <DonationPlaceholder className="w-full h-32" />
+        </div>
+      )}
+
       <div className="flex items-start gap-3">
         <span
           className="flex size-11 shrink-0 items-center justify-center rounded-full bg-fresh-soft text-fresh-ink"
@@ -108,6 +130,13 @@ export function DonationCard({
         </div>
       )}
 
+      {hasExpiry && isExpiringSoon(expiryTime) && (
+        <div className="flex items-center gap-1 rounded-full bg-urgent-soft text-urgent-ink px-2.5 py-0.5 text-xs font-semibold mb-2">
+          <Clock className="size-3.5" aria-hidden="true" />
+          Segera kadaluwasa dalam {Math.round(hoursUntilExpiry(expiryTime))} jam
+        </div>
+      )}
+
       {showMeter && hasExpiry ? (
         <FreshnessMeter expiryTime={expiryTime} />
       ) : hasExpiry ? (
@@ -126,7 +155,7 @@ export function DonationCard({
       {description && <p className="text-sm leading-relaxed text-foreground/80">{description}</p>}
 
       <div className="relative z-10 mt-auto flex flex-wrap items-center gap-2 pt-1">
-        <Link href={href} className={cn(buttonVariants({ variant: 'outline' }), onClaim ? '' : 'flex-1')}>
+        <Link href={href} className={cn("link-reveal", buttonVariants({ variant: 'outline' }), onClaim ? '' : 'flex-1')}>
           Lihat detail
         </Link>
         {onClaim && (

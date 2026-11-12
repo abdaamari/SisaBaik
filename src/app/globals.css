@@ -60,29 +60,29 @@
 }
 
 :root {
-  /* Embun: the ground. Tinta: the ink. Daun: the one action colour. */
-  --background: #f1f5ef;
-  --foreground: #13261e;
+  /* Cyan / Teal palette: #E3FDFD, #CBF1F5, #A6E3E9, #71C9CE */
+  --background: #f0fcfe;
+  --foreground: #082a33;
   --card: #ffffff;
-  --card-foreground: #13261e;
+  --card-foreground: #082a33;
   --popover: #ffffff;
-  --popover-foreground: #13261e;
-  --primary: #0b6b50;
-  --primary-foreground: #ffffff;
-  --secondary: #e3ebe0;
-  --secondary-foreground: #13261e;
-  --muted: #e3ebe0;
-  --muted-foreground: #4f6258;
-  --accent: #d6e6d9;
-  --accent-foreground: #13261e;
+  --popover-foreground: #082a33;
+  --primary: #71c9ce;
+  --primary-foreground: #04232b;
+  --secondary: #cbf1f5;
+  --secondary-foreground: #04232b;
+  --muted: #e3fdfd;
+  --muted-foreground: #2d6a7a;
+  --accent: #a6e3e9;
+  --accent-foreground: #04232b;
   --destructive: #c22f17;
-  --border: #d5e0d3;
-  --input: #bccbbc;
-  --ring: #0b6b50;
+  --border: #bfe8ee;
+  --input: #a6e3e9;
+  --ring: #71c9ce;
 
-  --fresh: #0b6b50;
-  --fresh-soft: #d9eee3;
-  --fresh-ink: #0b6b50;
+  --fresh: #71c9ce;
+  --fresh-soft: #cbf1f5;
+  --fresh-ink: #04232b;
   --soon: #f2b01e;
   --soon-soft: #fdf0cf;
   --soon-ink: #7a4f00;
@@ -90,45 +90,45 @@
   --urgent-soft: #fde4de;
   --urgent-ink: #b32a14;
 
-  --chart-1: #0b6b50;
-  --chart-2: #f2b01e;
-  --chart-3: #d4351c;
-  --chart-4: #7fa890;
-  --chart-5: #13261e;
+  --chart-1: #71c9ce;
+  --chart-2: #a6e3e9;
+  --chart-3: #cbf1f5;
+  --chart-4: #e3fdfd;
+  --chart-5: #082a33;
   --radius: 0.75rem;
   --sidebar: #ffffff;
-  --sidebar-foreground: #13261e;
-  --sidebar-primary: #0b6b50;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e3ebe0;
-  --sidebar-accent-foreground: #13261e;
-  --sidebar-border: #d5e0d3;
-  --sidebar-ring: #0b6b50;
+  --sidebar-foreground: #082a33;
+  --sidebar-primary: #71c9ce;
+  --sidebar-primary-foreground: #04232b;
+  --sidebar-accent: #cbf1f5;
+  --sidebar-accent-foreground: #082a33;
+  --sidebar-border: #bfe8ee;
+  --sidebar-ring: #71c9ce;
 }
 
 .dark {
-  --background: #0d1b16;
-  --foreground: #e8f1ec;
-  --card: #132720;
-  --card-foreground: #e8f1ec;
-  --popover: #16302a;
-  --popover-foreground: #e8f1ec;
-  --primary: #4fb894;
-  --primary-foreground: #06241a;
-  --secondary: #1b3128;
-  --secondary-foreground: #e8f1ec;
-  --muted: #1b3128;
-  --muted-foreground: #9db3a9;
-  --accent: #223b30;
-  --accent-foreground: #e8f1ec;
+  --background: #030b10;
+  --foreground: #dff9fb;
+  --card: #0a1e28;
+  --card-foreground: #dff9fb;
+  --popover: #0a1e28;
+  --popover-foreground: #dff9fb;
+  --primary: #71c9ce;
+  --primary-foreground: #030b10;
+  --secondary: #153a46;
+  --secondary-foreground: #dff9fb;
+  --muted: #153a46;
+  --muted-foreground: #7fd4e0;
+  --accent: #1a4d5a;
+  --accent-foreground: #dff9fb;
   --destructive: #ff7a62;
-  --border: #24392f;
-  --input: #35503f;
-  --ring: #4fb894;
+  --border: #1e4a5a;
+  --input: #2d6a7a;
+  --ring: #71c9ce;
 
-  --fresh: #4fb894;
-  --fresh-soft: #15382c;
-  --fresh-ink: #7fd6b5;
+  --fresh: #71c9ce;
+  --fresh-soft: #1a4d5a;
+  --fresh-ink: #dff9fb;
   --soon: #f5b93a;
   --soon-soft: #3a2d0c;
   --soon-ink: #f5c96a;
@@ -136,19 +136,19 @@
   --urgent-soft: #3d1812;
   --urgent-ink: #ff9a86;
 
-  --chart-1: #4fb894;
-  --chart-2: #f5b93a;
-  --chart-3: #ff6b50;
-  --chart-4: #3d6b58;
-  --chart-5: #e8f1ec;
-  --sidebar: #0f221b;
-  --sidebar-foreground: #e8f1ec;
-  --sidebar-primary: #4fb894;
-  --sidebar-primary-foreground: #06241a;
-  --sidebar-accent: #1b3128;
-  --sidebar-accent-foreground: #e8f1ec;
-  --sidebar-border: #24392f;
-  --sidebar-ring: #4fb894;
+  --chart-1: #71c9ce;
+  --chart-2: #a6e3e9;
+  --chart-3: #cbf1f5;
+  --chart-4: #e3fdfd;
+  --chart-5: #dff9fb;
+  --sidebar: #07151c;
+  --sidebar-foreground: #dff9fb;
+  --sidebar-primary: #71c9ce;
+  --sidebar-primary-foreground: #030b10;
+  --sidebar-accent: #153a46;
+  --sidebar-accent-foreground: #dff9fb;
+  --sidebar-border: #1e4a5a;
+  --sidebar-ring: #71c9ce;
 }
 
 @layer base {
@@ -183,41 +183,6 @@
   }
 }
 
-/* One entrance, used once on the landing hero. */
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* Confirms a claim: the check settles into place. */
-@keyframes settle {
-  0% {
-    transform: scale(0.6);
-    opacity: 0;
-  }
-  70% {
-    transform: scale(1.08);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-@utility animate-rise {
-  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@utility animate-settle {
-  animation: settle 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -227,4 +192,183 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  /* Under reduced motion: content stays visible, no travel */
+  [data-rise],
+  [data-reveal],
+  .js [data-rise],
+  .js [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .shutter[data-reveal] {
+    clip-path: inset(0) !important;
+  }
+
+  .shutter[data-reveal] img {
+    transform: none !important;
+  }
+}
+
+/* ---------- Motion helpers ---------- */
+/* Content stays visible without JavaScript; JS adds .js class and triggers reveals */
+
+.js [data-rise] {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: rise var(--t-reveal) var(--ease-soft) forwards;
+  animation-delay: calc(var(--i, 0) * 90ms + 150ms);
+}
+
+.js [data-reveal] {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 700ms var(--ease-soft), transform 900ms var(--ease-soft);
+}
+
+.js [data-reveal].is-in {
+  opacity: 1;
+  transform: none;
+}
+
+.shutter {
+  overflow: hidden;
+}
+
+.shutter[data-reveal] {
+  opacity: 1;
+  transform: none;
+  clip-path: inset(0 0 100% 0);
+  transition: clip-path 1100ms var(--ease-in-out);
+}
+
+.shutter[data-reveal] img {
+  transform: scale(1.12);
+  transition: transform 1500ms var(--ease-soft);
+}
+
+.shutter[data-reveal].is-in {
+  clip-path: inset(0);
+}
+
+.shutter[data-reveal].is-in img {
+  transform: none;
+}
+
+@keyframes rise {
+  to { opacity: 1; transform: none; }
+}
+
+/* Signature move: marquee for closing statement - smooth, seamless, editorial */
+.marquee {
+  overflow: hidden;
+  position: relative;
+}
+
+.marquee-track {
+  display: inline-flex;
+  gap: 3rem;
+  animation: marquee 24s linear infinite;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+}
+
+/* Hover and press feedback for controls */
+.button-press {
+  transition: transform var(--t-press) var(--ease-out), background-color var(--t-hover) ease, color var(--t-hover) ease;
+}
+
+.button-press:active {
+  transform: scale(0.97);
+}
+
+/* Card hover lift */
+.card-hover {
+  transition: transform var(--t-ui) var(--ease-soft), box-shadow var(--t-ui) ease, border-color var(--t-ui) ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+}
+
+/* Link underline reveal */
+.link-reveal {
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 0.07em;
+  transition: text-decoration-color var(--t-hover) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .link-reveal:hover {
+    text-decoration-color: currentColor;
+  }
+}
+
+/* Focus ring */
+.focus-ring:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* ---------- Loop animation untuk kartu di tengah halaman ---------- */
+/* Animasi naik-turun lembut yang loop terus-menerus, tidak patah dan tidak kosong. */
+@keyframes loop-float {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+  100% { transform: translateY(0); }
+}
+
+.loop-reveal {
+  animation: loop-float 4s ease-in-out infinite;
+}
+
+/* Saat reduced motion, matikan pergerakan tapi konten tetap terlihat penuh. */
+@media (prefers-reduced-motion: reduce) {
+  .loop-reveal {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* ---------- Leaflet map styling ---------- */
+.leaflet-container {
+  width: 100%;
+  height: 300px;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+
+/* Pastikan Leaflet tidak terganggu oleh Tailwind preflight */
+.leaflet-container .leaflet-tile,
+.leaflet-container img.leaflet-tile {
+  max-width: none;
+  max-height: none;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+}
+
+.leaflet-popup-content {
+  font-size: 0.875rem;
+  line-height: 1.5;
 }

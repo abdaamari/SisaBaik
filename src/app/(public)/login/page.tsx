@@ -54,18 +54,25 @@ export default function LoginPage() {
       }
 
       if (authData.user) {
-        toast.success('Berhasil masuk!');
         // After successful sign-in, decide where to send the user based on their role.
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const { data: profileData } = await supabase
+          const { data: profileData, error: profileError } = await supabase
             .from('profiles')
             .select('role')
             .eq('id', user.id)
-            .single() as { data: { role: 'provider' | 'partner' | 'admin' } | null };
-          const role = profileData?.role;
+            .single() as { data: { role: 'provider' | 'partner' | 'admin' } | null; error: Error | null };
+
+          if (profileError || !profileData) {
+            toast.error('Profil akun tidak ditemukan. Silakan daftar ulang.');
+            router.push('/register');
+            return;
+          }
+
+          const role = profileData.role;
+          toast.success('Berhasil masuk!');
           if (role === 'admin') {
-            router.push('/admin/verification');
+            router.push('/admin/dashboard');
           } else if (role === 'provider') {
             router.push('/provider/dashboard');
           } else if (role === 'partner') {
@@ -74,7 +81,7 @@ export default function LoginPage() {
             router.push('/');
           }
         } else {
-          router.push('/');
+          toast.error('Login gagal. Silakan coba lagi.');
         }
       } else {
         toast.error('Login gagal. Silakan coba lagi.');

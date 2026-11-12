@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Clock } from "lucide-react";
 import { CategoryIcon } from "./donation-card";
 import { FreshnessMeter } from "./freshness-meter";
 import { StatusBadge } from "./status-badge";
+import { isExpiringSoon, hoursUntilExpiry } from "@/lib/expiry";
 
 interface DonationRowProps {
   href: string;
@@ -62,6 +63,14 @@ export function DonationRow({
           ) : (
             <StatusBadge status={status} />
           )}
+
+          {isExpiringSoon(expiryTime) && (
+            <span className="flex items-center gap-1 rounded-full bg-urgent-soft text-urgent-ink px-2 py-0.5 text-[10px] font-semibold mt-1">
+              <Clock className="size-3" aria-hidden="true" />
+              {Math.round(hoursUntilExpiry(expiryTime))} jam
+            </span>
+          )}
+
           <ChevronRight
             className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
             aria-hidden="true"

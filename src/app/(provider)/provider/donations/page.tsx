@@ -13,6 +13,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoader } from "@/components/ui/page-loader";
+import { Pagination } from "@/components/ui/pagination";
+import { Reveal } from "@/components/ui/reveal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import { DONATION_CATEGORIES } from "@/lib/donation-options";
@@ -32,7 +34,10 @@ interface Donation {
   created_at: string;
   pickup_address?: string;
   description?: string | null;
+  image_url?: string | null;
 }
+
+const PAGE_SIZE = 10;
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "Semua" },
@@ -47,7 +52,6 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "urgent", label: "Paling mendesak" },
 ];
 
-// A sentinel that doubles as the visible label, so the select always shows readable text.
 const ALL_CATEGORIES = "Semua kategori";
 
 function parseStatus(value: string | null): StatusFilter {
@@ -63,42 +67,52 @@ function DonationsContent({ initialStatus }: { initialStatus: StatusFilter }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatus);
   const [categoryFilter, setCategoryFilter] = useState<string>(ALL_CATEGORIES);
   const [sort, setSort] = useState<SortKey>("newest");
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [cancelTarget, setCancelTarget] = useState<Donation | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const supabase = useMemo(() => createClient(), []);
 
-  const fetchDonations = useCallback(async (isActive: () => boolean = () => true) => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!isActive() || !user) return;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
-      const query = supabase
-        .from("donations")
-        .select("*")
-        .eq("provider_id", user.id)
-        .order("created_at", { ascending: false });
+  const fetchDonations = useCallback(
+    async (isActive: () => boolean = () => true) => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!isActive() || !user) return;
 
-      const { data, error } = await query;
+        const from = (page - 1) * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
 
-      if (error) throw error;
+        const query = supabase
+          .from("donations")
+          .select("*", { count: "exact" })
+          .eq("provider_id", user.id)
+          .order("created_at", { ascending: false })
+          .range(from, to);
 
-      if (!isActive()) return;
-      if (data) {
-        setDonations(data as Donation[]);
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+
+        if (!isActive()) return;
+        setTotalCount(count ?? 0);
+        setDonations((data ?? []) as Donation[]);
+      } catch (error) {
+        if (isActive()) {
+          toast.error("Gagal memuat daftar donasi");
+          console.error("Donations error:", error);
+        }
+      } finally {
+        if (isActive()) {
+          setIsLoading(false);
+        }
       }
-    } catch (error) {
-      if (isActive()) {
-        toast.error("Gagal memuat daftar donasi");
-        console.error("Donations error:", error);
-      }
-    } finally {
-      if (isActive()) {
-        setIsLoading(false);
-      }
-    }
-  }, [supabase]);
+    },
+    [supabase, page],
+  );
 
   useEffect(() => {
     let isActive = true;
@@ -111,6 +125,11 @@ function DonationsContent({ initialStatus }: { initialStatus: StatusFilter }) {
       clearTimeout(timeout);
     };
   }, [fetchDonations]);
+
+  // Reset ke halaman 1 saat filter atau pencarian berubah
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, categoryFilter, sort]);
 
   const counts = useMemo(() => {
     const result: Record<StatusFilter, number> = { all: donations.length, available: 0, claimed: 0, delivered: 0, cancelled: 0 };
@@ -165,6 +184,7 @@ function DonationsContent({ initialStatus }: { initialStatus: StatusFilter }) {
     setSearch("");
     setStatusFilter("all");
     setCategoryFilter(ALL_CATEGORIES);
+    setPage(1);
   };
 
   if (isLoading) {
@@ -173,18 +193,20 @@ function DonationsContent({ initialStatus }: { initialStatus: StatusFilter }) {
 
   return (
     <div>
-      <PageHeader
-        title="Donasi saya"
-        description="Semua makanan yang pernah Anda catat, lengkap dengan sisa waktu dan tahapnya."
-        action={
-          <Link href="/provider/donations/new" className={buttonVariants({ size: "lg" })}>
-            <Plus aria-hidden="true" />
-            Buat donasi
-          </Link>
-        }
-      />
+      <Reveal delayIndex={0}>
+        <PageHeader
+          title="Donasi saya"
+          description="Semua makanan yang pernah Anda catat, lengkap dengan sisa waktu dan tahapnya."
+          action={
+            <Link href="/provider/donations/new" className={buttonVariants({ size: "lg" })}>
+              <Plus aria-hidden="true" />
+              Buat donasi
+            </Link>
+          }
+        />
+      </Reveal>
 
-      {donations.length === 0 ? (
+      {totalCount === 0 ? (
         <EmptyState
           title="Belum ada donasi"
           description="Catat makanan berlebih pertama Anda. Mitra terverifikasi bisa langsung melihat dan mengklaimnya."
@@ -241,7 +263,7 @@ function DonationsContent({ initialStatus }: { initialStatus: StatusFilter }) {
 
           <p className="text-sm text-muted-foreground" aria-live="polite">
             Menampilkan <span className="font-semibold text-foreground tabular-nums">{visible.length}</span> dari{" "}
-            <span className="tabular-nums">{donations.length}</span> donasi
+            <span className="tabular-nums">{totalCount}</span> donasi
           </p>
 
           {visible.length === 0 ? (
@@ -258,30 +280,34 @@ function DonationsContent({ initialStatus }: { initialStatus: StatusFilter }) {
               }
             />
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {visible.map((donation) => (
-                <DonationCard
-                  key={donation.id}
-                  href={`/provider/donations/${donation.id}`}
-                  foodName={donation.food_name}
-                  category={donation.category}
-                  quantity={donation.quantity}
-                  unit={donation.unit}
-                  expiryTime={donation.expiry_time}
-                  address={donation.pickup_address}
-                  description={donation.description}
-                  status={donation.status}
-                  showMeter={donation.status === "available"}
-                  extraAction={
-                    donation.status === "available" ? (
-                      <Button variant="destructive" onClick={() => setCancelTarget(donation)}>
-                        Batalkan
-                      </Button>
-                    ) : undefined
-                  }
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {visible.map((donation) => (
+                  <DonationCard
+                    key={donation.id}
+                    href={`/provider/donations/${donation.id}`}
+                    foodName={donation.food_name}
+                    category={donation.category}
+                    quantity={donation.quantity}
+                    unit={donation.unit}
+                    expiryTime={donation.expiry_time}
+                    address={donation.pickup_address}
+                    description={donation.description}
+                    imageUrl={donation.image_url ?? undefined}
+                    status={donation.status}
+                    showMeter={donation.status === "available"}
+                    extraAction={
+                      donation.status === "available" ? (
+                        <Button variant="destructive" onClick={() => setCancelTarget(donation)}>
+                          Batalkan
+                        </Button>
+                      ) : undefined
+                    }
+                  />
+                ))}
+              </div>
+              <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+            </>
           )}
         </div>
       )}

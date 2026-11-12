@@ -15,6 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoader } from "@/components/ui/page-loader";
+import { Pagination } from "@/components/ui/pagination";
+import { Reveal } from "@/components/ui/reveal";
 import { DONATION_CATEGORIES } from "@/lib/donation-options";
 import { getProviderName, type ProfileRef } from "@/lib/format";
 
@@ -28,9 +30,12 @@ interface PartnerDonation {
   expiry_time: string;
   pickup_address: string;
   description: string | null;
+  image_url: string | null;
   created_at: string;
   profiles: ProfileRef;
 }
+
+const PAGE_SIZE = 10;
 
 type SortKey = "urgent" | "newest";
 
@@ -49,10 +54,13 @@ export default function PartnerDonationsPage() {
   const [donations, setDonations] = useState<PartnerDonation[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string>(ALL);
-  // Time is what matters for cooked food, so the soonest-expiring donation comes first.
   const [sort, setSort] = useState<SortKey>("urgent");
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [claimTarget, setClaimTarget] = useState<PartnerDonation | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -61,24 +69,35 @@ export default function PartnerDonationsPage() {
       if (!user) { router.push("/login"); return; }
       const { data: profile } = (await supabase.from("profiles").select("is_verified").eq("id", user.id).single()) as { data: { is_verified: boolean } | null };
       setIsVerified(profile ? !!profile.is_verified : false);
-      const { data, error } = await supabase
+
+      const from = (page - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      const { data, error, count } = await supabase
         .from("donations")
-        .select("id, food_name, category, quantity, unit, status, expiry_time, pickup_address, description, created_at, profiles!donations_provider_id_fkey(organization_name)")
+        .select("id, food_name, category, quantity, unit, status, expiry_time, pickup_address, description, image_url, created_at, profiles!donations_provider_id_fkey(organization_name)", { count: "exact" })
         .eq("status", "available")
         .gt("expiry_time", new Date().toISOString())
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(from, to);
       if (error) throw error;
+      setTotalCount(count ?? 0);
       setDonations((data as unknown as PartnerDonation[]) ?? []);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Gagal memuat donasi";
       toast.error(msg);
     } finally { setIsLoading(false); }
-  }, [supabase, router]);
+  }, [supabase, router, page]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchData();
   }, [fetchData]);
+
+  // Reset ke halaman 1 saat filter atau pencarian berubah
+  useEffect(() => {
+    setPage(1);
+  }, [search, category, sort]);
 
   const categoryOptions = useMemo(() => {
     const countFor = (name: string) => donations.filter((d) => d.category === name).length;
@@ -124,21 +143,29 @@ export default function PartnerDonationsPage() {
 
   const hasFilters = search.trim() !== "" || category !== ALL;
 
+  const resetFilters = () => {
+    setSearch("");
+    setCategory(ALL);
+    setPage(1);
+  };
+
   if (isLoading) {
     return <PageLoader variant="list" label="Memuat donasi tersedia" />;
   }
 
   return (
     <div>
-      <PageHeader
-        title="Donasi tersedia"
-        description="Makanan layak dari penyedia, diurutkan dari yang waktunya paling sempit."
-        action={
-          <Link href="/partner/orders" className={buttonVariants({ variant: "outline", size: "lg" })}>
-            Pesanan saya
-          </Link>
-        }
-      />
+      <Reveal delayIndex={0}>
+        <PageHeader
+          title="Donasi tersedia"
+          description="Makanan layak dari penyedia, diurutkan dari yang waktunya paling sempit."
+          action={
+            <Link href="/partner/orders" className={buttonVariants({ variant: "outline", size: "lg" })}>
+              Pesanan saya
+            </Link>
+          }
+        />
+      </Reveal>
 
       <div className="space-y-6">
         {isVerified === false && (
@@ -173,53 +200,58 @@ export default function PartnerDonationsPage() {
           <span className="font-semibold text-foreground tabular-nums">{visible.length}</span> donasi ditemukan
         </p>
 
-        {visible.length === 0 ? (
+        {totalCount === 0 ? (
           <EmptyState
             icon={<Package className="size-6" />}
-            title={donations.length === 0 ? "Belum ada donasi tersedia" : "Tidak ada yang cocok"}
-            description={
-              donations.length === 0
-                ? "Donasi baru muncul di sini begitu penyedia mencatatnya. Muat ulang untuk memeriksa."
-                : "Ubah kata kunci atau kategori untuk melihat lebih banyak donasi."
-            }
+            title="Belum ada donasi tersedia"
+            description="Donasi baru muncul di sini begitu penyedia mencatatnya. Muat ulang untuk memeriksa."
             action={
-              hasFilters ? (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSearch("");
-                    setCategory(ALL);
-                  }}
-                >
-                  Hapus filter
-                </Button>
-              ) : (
-                <Button variant="outline" onClick={() => void fetchData()}>
-                  Muat ulang
-                </Button>
-              )
+              <Button variant="outline" onClick={() => void fetchData()}>
+                Muat ulang
+              </Button>
             }
           />
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {visible.map((d) => (
-              <DonationCard
-                key={d.id}
-                href={`/partner/donations/${d.id}`}
-                foodName={d.food_name}
-                category={d.category}
-                quantity={d.quantity}
-                unit={d.unit}
-                providerName={getProviderName(d.profiles)}
-                expiryTime={d.expiry_time}
-                address={d.pickup_address}
-                description={d.description}
-                onClaim={() => setClaimTarget(d)}
-                claimDisabled={isVerified === false}
-                claimHint={isVerified === false ? "Menunggu verifikasi admin" : undefined}
+          <>
+            {visible.length === 0 ? (
+              <EmptyState
+                icon={<Search className="size-6" />}
+                title="Tidak ada yang cocok"
+                description="Ubah kata kunci atau kategori untuk melihat lebih banyak donasi."
+                action={
+                  hasFilters ? (
+                    <Button variant="outline" onClick={resetFilters}>
+                      Hapus filter
+                    </Button>
+                  ) : undefined
+                }
               />
-            ))}
-          </div>
+            ) : (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {visible.map((d) => (
+                    <DonationCard
+                      key={d.id}
+                      href={`/partner/donations/${d.id}`}
+                      foodName={d.food_name}
+                      category={d.category}
+                      quantity={d.quantity}
+                      unit={d.unit}
+                      providerName={getProviderName(d.profiles)}
+                      expiryTime={d.expiry_time}
+                      address={d.pickup_address}
+                      description={d.description}
+                      imageUrl={d.image_url ?? undefined}
+                      onClaim={() => setClaimTarget(d)}
+                      claimDisabled={isVerified === false}
+                      claimHint={isVerified === false ? "Menunggu verifikasi admin" : undefined}
+                    />
+                  ))}
+                </div>
+                <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+              </>
+            )}
+          </>
         )}
       </div>
 
