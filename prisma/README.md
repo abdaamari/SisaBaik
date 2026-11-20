@@ -23,6 +23,6 @@ Continue applying application SQL migrations manually through Supabase.
 Do not use this introspected schema as a replacement for SQL migrations:
 RLS, triggers, functions, and some constraints are not fully represented.
 
-Prisma Client is generated but is not wired into application routes.
-Existing application queries still use Supabase clients and their user sessions.
+Prisma Client powers `/api/admin/stats`, after Supabase session and admin-role
+verification. Other application queries still use Supabase clients and their user sessions.
 Direct database credentials do not automatically carry Supabase user JWT/RLS context.

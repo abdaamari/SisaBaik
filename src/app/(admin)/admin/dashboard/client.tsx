@@ -2,10 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
-  LayoutDashboard,
   Package,
   ShoppingBag,
   ShieldCheck,
@@ -15,12 +13,11 @@ import {
   XCircle,
   Truck,
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
-import { formatDateTime } from "@/lib/format";
 import { StatCard } from "@/components/ui/stat-card";
 
 interface Stat {
@@ -45,61 +42,23 @@ const STAT_CONFIG: Record<string, { label: string; icon: React.ElementType; colo
 export default function AdminDashboardClient() {
   const [stats, setStats] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const supabase = createClient();
 
   const fetchStats = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [
-        { count: totalProviders },
-        { count: totalPartners },
-        { count: verifiedPartners },
-        { count: pendingPartners },
-        { count: totalDonations },
-        { count: availableDonations },
-        { count: claimedDonations },
-        { count: deliveredDonations },
-        { count: cancelledDonations },
-        { count: totalOrders },
-        { count: pendingOrders },
-        { count: completedOrders },
-      ] = await Promise.all([
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "provider"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "partner"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "partner").eq("is_verified", true),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "partner").eq("is_verified", false),
-        supabase.from("donations").select("*", { count: "exact", head: true }),
-        supabase.from("donations").select("*", { count: "exact", head: true }).eq("status", "available"),
-        supabase.from("donations").select("*", { count: "exact", head: true }).eq("status", "claimed"),
-        supabase.from("donations").select("*", { count: "exact", head: true }).eq("status", "delivered"),
-        supabase.from("donations").select("*", { count: "exact", head: true }).eq("status", "cancelled"),
-        supabase.from("orders").select("*", { count: "exact", head: true }),
-        supabase.from("orders").select("*", { count: "exact", head: true }).eq("status", "pending"),
-        supabase.from("orders").select("*", { count: "exact", head: true }).eq("status", "completed"),
-      ]);
-
-      setStats({
-        totalProviders: totalProviders ?? 0,
-        totalPartners: totalPartners ?? 0,
-        verifiedPartners: verifiedPartners ?? 0,
-        pendingPartners: pendingPartners ?? 0,
-        totalDonations: totalDonations ?? 0,
-        availableDonations: availableDonations ?? 0,
-        claimedDonations: claimedDonations ?? 0,
-        deliveredDonations: deliveredDonations ?? 0,
-        cancelledDonations: cancelledDonations ?? 0,
-        totalOrders: totalOrders ?? 0,
-        pendingOrders: pendingOrders ?? 0,
-        completedOrders: completedOrders ?? 0,
-      });
+      const response = await fetch("/api/admin/stats", { cache: "no-store" });
+      if (!response.ok) throw new Error("Gagal memuat statistik");
+      setStats(await response.json());
     } catch {
       toast.error("Gagal memuat statistik admin");
     } finally {
       setIsLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
+    // Initial request shares the loading state with the manual refresh action.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchStats();
   }, [fetchStats]);
 
