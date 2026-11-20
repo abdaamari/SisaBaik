@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { FreshnessMeter } from "@/components/ui/freshness-meter";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoader } from "@/components/ui/page-loader";
+import { PickupMap } from "@/components/ui/pickup-map";
 import { Pagination } from "@/components/ui/pagination";
 import { Reveal } from "@/components/ui/reveal";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -31,6 +32,8 @@ interface OrderDonation {
   status: string;
   expiry_time: string;
   pickup_address: string;
+  latitude: number | null;
+  longitude: number | null;
   description: string | null;
   profiles?: ProfileRef;
 }
@@ -103,7 +106,7 @@ export default function PartnerOrdersPage() {
 
       const { data, error, count } = await supabase
         .from("orders")
-        .select("id, status, claimed_at, completed_at, donation_id, donations!inner(id, provider_id, food_name, category, quantity, unit, status, expiry_time, pickup_address, description, profiles!donations_provider_id_fkey(organization_name))", { count: "exact" })
+        .select("id, status, claimed_at, completed_at, donation_id, donations!inner(id, provider_id, food_name, category, quantity, unit, status, expiry_time, pickup_address, latitude, longitude, description, profiles!donations_provider_id_fkey(organization_name))", { count: "exact" })
         .eq("partner_id", user.id)
         .order("claimed_at", { ascending: false })
         .range(from, to);
@@ -124,10 +127,10 @@ export default function PartnerOrdersPage() {
     void fetchOrders();
   }, [fetchOrders]);
 
-  // Reset ke halaman 1 saat filter berubah
-  useEffect(() => {
+  function changeStatusFilter(value: StatusFilter) {
+    setStatusFilter(value);
     setPage(1);
-  }, [statusFilter]);
+  }
 
   const counts = useMemo(() => {
     const result: Record<StatusFilter, number> = { all: totalCount, pending: 0, in_transit: 0, completed: 0, cancelled: 0 };
@@ -213,7 +216,7 @@ export default function PartnerOrdersPage() {
           <ChoiceChips
             label="Filter status pesanan"
             value={statusFilter}
-            onChange={setStatusFilter}
+            onChange={changeStatusFilter}
             options={STATUS_OPTIONS.map((option) => ({ ...option, count: counts[option.value] }))}
           />
 
@@ -223,7 +226,7 @@ export default function PartnerOrdersPage() {
               title="Tidak ada pesanan di tahap ini"
               description="Pilih tahap lain untuk melihat pesanan Anda."
               action={
-                <Button variant="outline" onClick={() => setStatusFilter("all")}>
+                <Button variant="outline" onClick={() => changeStatusFilter("all")}>
                   Tampilkan semua
                 </Button>
               }
@@ -278,6 +281,17 @@ export default function PartnerOrdersPage() {
                             <p>Diklaim {formatDateTime(o.claimed_at)}</p>
                             {o.completed_at && <p>Selesai {formatDateTime(o.completed_at)}</p>}
                           </div>
+
+                          {d && (
+                            <details className="rounded-xl border border-border p-4">
+                              <summary className="cursor-pointer rounded text-sm font-semibold focus-visible:outline-2 focus-visible:outline-ring">
+                                Lihat peta pengambilan
+                              </summary>
+                              <div className="mt-4">
+                                <PickupMap latitude={d.latitude} longitude={d.longitude} address={d.pickup_address} />
+                              </div>
+                            </details>
+                          )}
 
                           <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
                             {isPending && (

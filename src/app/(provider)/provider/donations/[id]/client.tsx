@@ -13,6 +13,7 @@ import { FreshnessMeter } from "@/components/ui/freshness-meter";
 import { InfoItem } from "@/components/ui/info-item";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoader } from "@/components/ui/page-loader";
+import { PickupMap } from "@/components/ui/pickup-map";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StatusTimeline, getDonationTimeline } from "@/components/ui/status-timeline";
 import { createClient } from "@/lib/supabase/client";
@@ -29,6 +30,8 @@ interface DonationDetail {
   status: DonationStatus;
   expiry_time: string;
   pickup_address: string;
+  latitude: number | null;
+  longitude: number | null;
   description: string | null;
   image_url: string | null;
   created_at: string;
@@ -63,7 +66,7 @@ function ProviderDonationDetailInner() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!isActive()) return;
       if (!user) { router.replace("/login"); return; }
-      const { data, error } = await supabase.from("donations").select("id, food_name, category, quantity, unit, status, expiry_time, pickup_address, description, image_url, created_at, updated_at").eq("id", id).eq("provider_id", user.id).single();
+      const { data, error } = await supabase.from("donations").select("id, food_name, category, quantity, unit, status, expiry_time, pickup_address, latitude, longitude, description, image_url, created_at, updated_at").eq("id", id).eq("provider_id", user.id).single();
       if (!isActive()) return;
       if (error || !data) { setNotFound(true); setDonation(null); return; }
       setDonation(data as DonationDetail);
@@ -198,6 +201,10 @@ function ProviderDonationDetailInner() {
                 <span className="whitespace-pre-wrap">{donation.pickup_address}</span>
               </InfoItem>
             </dl>
+            <section className="space-y-3" aria-label="Lokasi pengambilan">
+              <h2 className="font-semibold">Lokasi pengambilan</h2>
+              <PickupMap latitude={donation.latitude} longitude={donation.longitude} address={donation.pickup_address} />
+            </section>
 
             {donation.description && (
               <section aria-label="Deskripsi kondisi" className="rounded-xl bg-muted p-4">
