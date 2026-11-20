@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { LayoutDashboard, Loader2, LogOut, Package, Plus, ShieldCheck, ShoppingBag, Users, Gift, Truck } from 'lucide-react';
+import { LayoutDashboard, Loader2, LogOut, Package, Plus, ShieldCheck, ShoppingBag, Users, Gift, Truck, UserRound, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { Logo } from './logo';
 import { ThemeToggle } from './theme-toggle';
+import { getChatThreadId, useNotifications } from '@/hooks/use-notifications';
 import { NotificationBell } from './notification-bell';
 
 type UserRole = 'provider' | 'partner' | 'admin';
@@ -38,12 +39,14 @@ const NAV_ITEMS: Record<UserRole, NavItem[]> = {
       isActive: (p) => startsWith('/provider/donations')(p) && !startsWith('/provider/donations/new')(p),
     },
     { href: '/provider/donations/new', label: 'Buat donasi', icon: Plus, isActive: startsWith('/provider/donations/new') },
+    { href: '/provider/messages', label: 'Pesan', icon: MessageCircle, isActive: startsWith('/provider/messages') },
     { href: '/provider/rewards', label: 'Hadiah & Poin', icon: Gift, isActive: startsWith('/provider/rewards') },
   ],
   partner: [
     { href: '/partner/dashboard', label: 'Beranda', icon: LayoutDashboard, isActive: startsWith('/partner/dashboard') },
     { href: '/partner/donations', label: 'Donasi tersedia', icon: Package, isActive: startsWith('/partner/donations') },
     { href: '/partner/orders', label: 'Pesanan saya', icon: ShoppingBag, isActive: startsWith('/partner/orders') },
+    { href: '/partner/messages', label: 'Pesan', icon: MessageCircle, isActive: startsWith('/partner/messages') },
   ],
   admin: [
     { href: '/admin/dashboard', label: 'Beranda', icon: LayoutDashboard, isActive: startsWith('/admin/dashboard') },
@@ -52,6 +55,7 @@ const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { href: '/admin/orders', label: 'Pesanan', icon: ShoppingBag, isActive: startsWith('/admin/orders') },
     { href: '/admin/rewards', label: 'Kelola Hadiah', icon: Gift, isActive: startsWith('/admin/rewards') },
     { href: '/admin/reward-redemptions', label: 'Penukaran', icon: Truck, isActive: startsWith('/admin/reward-redemptions') },
+    { href: '/admin/messages', label: 'Pesan', icon: MessageCircle, isActive: startsWith('/admin/messages') },
     { href: '/admin/verification', label: 'Verifikasi Mitra', icon: ShieldCheck, isActive: startsWith('/admin/verification') },
   ],
 };
@@ -68,6 +72,11 @@ export function AppShell({ children, userRole }: AppShellProps) {
   const [signingOut, setSigningOut] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const items = NAV_ITEMS[userRole];
+  const { notifications } = useNotifications(userId);
+  // Badge "Pesan" hanya menghitung notifikasi chat yang belum dibaca.
+  const chatUnreadCount = notifications.filter(
+    (notification) => !notification.read && getChatThreadId(notification) !== null,
+  ).length;
 
   useEffect(() => {
     (async () => {
@@ -118,7 +127,7 @@ export function AppShell({ children, userRole }: AppShellProps) {
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex h-11 items-center gap-3 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                  'relative flex h-11 items-center gap-3 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                   active
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground',
@@ -126,6 +135,11 @@ export function AppShell({ children, userRole }: AppShellProps) {
               >
                 <Icon className="size-[18px]" aria-hidden="true" />
                 {item.label}
+                {item.label === 'Pesan' && chatUnreadCount > 0 && (
+                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                    {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -142,6 +156,19 @@ export function AppShell({ children, userRole }: AppShellProps) {
             <p className="text-sm font-semibold text-foreground">{ROLE_LABEL[userRole]}</p>
             <ThemeToggle />
           </div>
+          <Link
+            href={`/${userRole}/profile`}
+            aria-current={startsWith(`/${userRole}/profile`)(pathname) ? 'page' : undefined}
+            className={cn(
+              'flex h-11 w-full items-center gap-3 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+              startsWith(`/${userRole}/profile`)(pathname)
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+            )}
+          >
+            <UserRound className="size-[18px]" aria-hidden="true" />
+            Profil saya
+          </Link>
           <button
             type="button"
             onClick={handleSignOut}
@@ -161,6 +188,13 @@ export function AppShell({ children, userRole }: AppShellProps) {
         </Link>
         <div className="flex items-center">
           <ThemeToggle />
+          <Link
+            href={`/${userRole}/profile`}
+            aria-label="Profil saya"
+            className="inline-flex size-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <UserRound className="size-[18px]" aria-hidden="true" />
+          </Link>
           <button
             type="button"
             onClick={handleSignOut}
@@ -202,17 +236,22 @@ export function AppShell({ children, userRole }: AppShellProps) {
                     href={item.href}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'flex min-h-16 flex-col items-center justify-center gap-1 px-1 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+                      'relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
                       active ? 'text-primary' : 'text-muted-foreground',
                     )}
                   >
                     <span
                       className={cn(
-                        'flex h-7 w-14 items-center justify-center rounded-full transition-colors',
+                        'relative flex h-7 w-14 items-center justify-center rounded-full transition-colors',
                         active ? 'bg-fresh-soft' : 'bg-transparent',
                       )}
                     >
                       <Icon className="size-5" aria-hidden="true" />
+                      {item.label === 'Pesan' && chatUnreadCount > 0 && (
+                        <span className="absolute right-1 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                          {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                        </span>
+                      )}
                     </span>
                     {item.label}
                   </Link>

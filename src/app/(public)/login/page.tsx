@@ -13,6 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { AuthShell } from '@/components/auth/auth-shell';
+import { GoogleSignIn } from '@/components/auth/google-sign-in';
 import { createClient } from '@/lib/supabase/client';
 
 const loginSchema = z.object({
@@ -48,6 +49,8 @@ export default function LoginPage() {
         toast.error(
           authError.message === 'Invalid login credentials'
             ? 'Email atau password salah. Periksa lagi lalu coba masuk.'
+            : authError.code === 'email_not_confirmed'
+              ? 'Email belum diverifikasi. Buka kotak masuk atau folder spam, lalu klik tautan verifikasi sebelum masuk.'
             : `Gagal masuk: ${authError.message}`,
         );
         return;
@@ -108,6 +111,7 @@ export default function LoginPage() {
       }
     >
       <Form {...form}>
+        <GoogleSignIn />
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5" noValidate>
           <FormField
             control={form.control}
@@ -145,6 +149,14 @@ export default function LoginPage() {
                 <FormControl>
                   <PasswordInput autoComplete="current-password" placeholder="Masukkan password" {...field} />
                 </FormControl>
+                <div className="flex justify-end">
+                  <Link
+                    href="/forgot-password"
+                    className="rounded-sm text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  >
+                    Lupa password?
+                  </Link>
+                </div>
                 <FormMessage />
               </FormItem>
             )}

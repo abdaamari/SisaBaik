@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, BellOff, ChevronDown, X } from "lucide-react";
+import { Bell, BellOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/format";
 import { useNotifications } from "@/hooks/use-notifications";
 
@@ -83,10 +83,9 @@ export function NotificationBell({ userId, className }: NotificationBellProps) {
               <ul className="divide-y divide-border">
                 {notifications.map((n) => (
                   <li key={n.id} className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => markAsRead(n.id)}
-                      className="w-full flex items-start gap-3"
+                    <div
+                      onClick={() => void markAsRead(n.id)}
+                      className="w-full flex items-start gap-3 cursor-pointer"
                     >
                       <div className="flex items-start gap-2">
                         <div className="flex items-center justify-center min-w-6 h-6 rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">
@@ -116,7 +115,7 @@ export function NotificationBell({ userId, className }: NotificationBellProps) {
                       >
                         <X className="size-3" aria-hidden="true" />
                       </button>
-                    </button>
+                    </div>
                   </li>
                 ))}
               </ul>

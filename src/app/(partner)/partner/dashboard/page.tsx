@@ -75,6 +75,14 @@ export default function PartnerDashboardPage() {
       }
 
       setIsVerified(!!profile.is_verified);
+      if (profile.role === "partner" && !profile.is_verified) {
+        // Creating the support thread places this new/unverified partner in Admin's inbox.
+        try {
+          await supabase.rpc("get_or_create_support_chat", {} as never);
+        } catch (error) {
+          console.error("Could not prepare partner support chat:", error);
+        }
+      }
       const [
         { count: availableDonations },
         { count: claimedDonations },
@@ -171,7 +179,10 @@ export default function PartnerDashboardPage() {
       {isVerified === false && (
         <Notice title="Akun Anda belum diverifikasi">
           Anda bisa melihat semua donasi yang tersedia, tetapi tombol klaim aktif setelah admin memverifikasi akun.
-          Hubungi admin bila verifikasi tertunda.
+          {" "}Hubungi admin bila verifikasi tertunda melalui{" "}
+          <Link href="/partner/messages" className="font-semibold underline underline-offset-2">
+            chat Admin
+          </Link>.
         </Notice>
       )}
 

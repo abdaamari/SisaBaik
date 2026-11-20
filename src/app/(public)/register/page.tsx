@@ -14,9 +14,11 @@ import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Textarea } from '@/components/ui/textarea';
 import { AuthShell } from '@/components/auth/auth-shell';
+import { GoogleSignIn } from '@/components/auth/google-sign-in';
 import { registerSchema, type RegisterFormData } from '@/lib/validations/auth';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
+import { REGISTRATION_ROLES } from '@/lib/registration-options';
 
 type Role = 'provider' | 'partner';
 
@@ -32,14 +34,14 @@ const ROLES: {
     title: 'Penyedia makanan',
     text: 'Punya makanan berlebih yang masih layak, dan ingin menyalurkannya.',
     icon: Store,
-    types: ['Restoran', 'Katering', 'Toko Roti', 'Hotel', 'Kantin'],
+    types: [...REGISTRATION_ROLES[0].types],
   },
   {
     value: 'partner',
     title: 'Mitra penyalur',
     text: 'Menjemput dan menyalurkan makanan ke orang yang membutuhkan.',
     icon: Handshake,
-    types: ['LSM', 'Bank Makanan', 'Yayasan', 'Komunitas'],
+    types: [...REGISTRATION_ROLES[1].types],
   },
 ];
 
@@ -77,6 +79,7 @@ export default function RegisterPage() {
         email: data.email,
         password: data.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             role: data.role,
             organization_name: data.organization_name,
@@ -88,12 +91,25 @@ export default function RegisterPage() {
       });
 
       if (authError) {
+        if (
+          authError.code === 'email_address_invalid' ||
+          authError.code === 'email_address_not_authorized' ||
+          /email address.*invalid/i.test(authError.message)
+        ) {
+          form.setError('email', {
+            type: 'server',
+            message: authError.code === 'email_address_not_authorized'
+              ? 'Email ini belum dapat menerima email dari layanan kami. Hubungi admin atau gunakan login Google.'
+              : 'Alamat email tidak valid. Gunakan email aktif milik Anda yang bisa diakses untuk pemulihan password.',
+          }, { shouldFocus: true });
+          return;
+        }
         toast.error(`Gagal mendaftar: ${authError.message}`);
         return;
       }
 
       if (authData.user) {
-        toast.success('Pendaftaran berhasil! Silakan cek email Anda untuk verifikasi.');
+        toast.success('Pendaftaran berhasil.');
         router.push('/login');
       } else {
         toast.error('Pendaftaran gagal. Silakan coba lagi.');
@@ -149,6 +165,7 @@ export default function RegisterPage() {
       </div>
 
       <Form {...form}>
+        <GoogleSignIn />
         <form onSubmit={handleFormSubmit} className="space-y-5" noValidate>
           {step === 0 && (
             <>
@@ -285,6 +302,9 @@ export default function RegisterPage() {
 
           {step === 1 && (
             <>
+              <p className="text-sm text-muted-foreground">
+                Gunakan email aktif yang bisa Anda akses. Kami akan mengirim tautan verifikasi ke email ini; alamat yang sama digunakan untuk reset password.
+              </p>
               <FormField
                 control={form.control}
                 name="email"

@@ -36,7 +36,15 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const publicRoutes = ["/", "/login", "/register"];
+  const publicRoutes = [
+    "/",
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/reset-password",
+    "/auth/callback",
+    "/complete-profile",
+  ];
 
   // Public routes: show the page as‑is (no automatic redirect).
   // The login page itself now handles post‑login navigation based on role.
@@ -62,6 +70,9 @@ export async function proxy(request: NextRequest) {
   };
 
   if (profileError || !profileData) {
+    if (!profileError || profileError.message.includes("0 rows")) {
+      return NextResponse.redirect(new URL("/complete-profile", request.url));
+    }
     await supabase.auth.signOut();
     return NextResponse.redirect(new URL("/login", request.url));
   }

@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Building2, Calendar, Clock, Hash, Loader2, MapPin, Package, Tag } from "lucide-react";
+import { Building2, Calendar, Clock, Hash, Loader2, MapPin, MessageCircle, Package, Tag } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -16,11 +16,11 @@ import { Notice } from "@/components/ui/notice";
 import { OptimizedImage } from "@/components/ui/image";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageLoader } from "@/components/ui/page-loader";
-import { Rating } from "@/components/ui/rating";
 import { ReviewForm } from "@/components/ui/review-form";
 import { ReviewList } from "@/components/ui/review-list";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
+import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import type { Map as LeafletMap } from "leaflet";
 import { formatDateTime, getProviderName, type ProfileRef } from "@/lib/format";
 
 // Import Leaflet CSS (diperlukan untuk tampilan peta)
@@ -54,10 +54,11 @@ function PartnerDonationDetailInner() {
   const [donation, setDonation] = useState<PartnerDonationDetail | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  const [startingChat, setStartingChat] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [hasCompletedOrder, setHasCompletedOrder] = useState<boolean | null>(null);
-  const mapRef = useRef<any>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -131,6 +132,22 @@ function PartnerDonationDetailInner() {
     } finally { setClaiming(false); }
   };
 
+  const handleOpenProviderChat = async () => {
+    if (!donation || isVerified !== true || startingChat) return;
+    setStartingChat(true);
+    try {
+      const { data: threadId, error } = await supabase.rpc("get_or_create_donation_chat", {
+        p_donation_id: donation.id,
+      } as never);
+      if (error) throw error;
+      router.push(`/partner/messages?thread=${encodeURIComponent(threadId)}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Chat dengan penyedia belum bisa dibuka.");
+    } finally {
+      setStartingChat(false);
+    }
+  };
+
   if (isLoading) return <PageLoader variant="detail" label="Memuat detail donasi" />;
 
   if (notFound || !donation) {
@@ -167,7 +184,8 @@ function PartnerDonationDetailInner() {
       <div className="space-y-6">
         {isVerified === false && (
           <Notice title="Akun Anda belum diverifikasi">
-            Anda bisa melihat detail, tetapi klaim aktif setelah admin menyetujui akun Anda.
+            Anda bisa melihat detail, tetapi klaim dan chat dengan penyedia aktif setelah admin menyetujui akun Anda. {" "}
+            <Link href="/partner/messages" className="font-semibold underline underline-offset-2">Hubungi Admin</Link>
           </Notice>
         )}
 
@@ -287,6 +305,12 @@ function PartnerDonationDetailInner() {
             )}
 
             <div className="flex flex-wrap items-center gap-3 border-t border-border pt-6">
+              {isVerified && donation.status !== "cancelled" && donation.status !== "delivered" && (
+                <Button size="lg" variant="outline" onClick={() => void handleOpenProviderChat()} disabled={startingChat}>
+                  {startingChat ? <Loader2 className="animate-spin" aria-hidden="true" /> : <MessageCircle aria-hidden="true" />}
+                  {startingChat ? "Membuka chat..." : "Chat dengan penyedia"}
+                </Button>
+              )}
               {canClaim ? (
                 <Button size="lg" onClick={() => setConfirmOpen(true)} disabled={isVerified === false || claiming}>
                   {claiming && <Loader2 className="animate-spin" aria-hidden="true" />}

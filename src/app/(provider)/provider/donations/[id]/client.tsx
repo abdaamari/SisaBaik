@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Calendar, Clock, Hash, MapPin, Package, Tag, XCircle } from "lucide-react";
+import { Calendar, Clock, Hash, MapPin, MessageCircle, Package, Tag, XCircle } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -214,6 +214,15 @@ function ProviderDonationDetailInner() {
                 </Button>
               ) : (
                 <p className="text-sm text-muted-foreground">Donasi hanya bisa dibatalkan selama masih tersedia.</p>
+              )}
+              {donation.status !== "available" && donation.status !== "cancelled" && (
+                <Link
+                  href={`/provider/messages?donation=${encodeURIComponent(donation.id)}`}
+                  className={buttonVariants({ variant: "outline" })}
+                >
+                  <MessageCircle aria-hidden="true" />
+                  Chat dengan mitra
+                </Link>
               )}
               <Link href="/provider/donations" className={buttonVariants({ variant: "outline", className: "sm:ml-auto" })}>
                 Kembali ke daftar

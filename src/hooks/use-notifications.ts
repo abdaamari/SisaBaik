@@ -4,8 +4,40 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
 
+function generateInstanceId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 type Notification = Database["public"]["Tables"]["notifications"]["Row"];
 type NotificationInsert = Database["public"]["Tables"]["notifications"]["Insert"];
+
+const REFRESH_EVENT = "sisabaik:notifications-refresh";
+
+/**
+ * Ambil chat_thread_id dari kolom `data` (jsonb) sebuah notifikasi.
+ * Menangani data yang sudah di-parse (object) maupun string JSON.
+ */
+export function getChatThreadId(notification: { data?: unknown }): string | null {
+  const raw = notification.data;
+  if (!raw) return null;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const id = parsed?.chat_thread_id;
+      return typeof id === "string" ? id : null;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof raw === "object") {
+    const id = (raw as Record<string, unknown>).chat_thread_id;
+    return typeof id === "string" ? id : null;
+  }
+  return null;
+}
 
 interface UseNotificationsReturn {
   notifications: Notification[];
@@ -23,6 +55,7 @@ export function useNotifications(userId: string | null): UseNotificationsReturn 
   const [isLoading, setIsLoading] = useState(false);
   const supabase = createClient();
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const instanceIdRef = useRef<string>(generateInstanceId());
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -47,14 +80,25 @@ export function useNotifications(userId: string | null): UseNotificationsReturn 
   }, [userId, supabase]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchNotifications();
+  }, [fetchNotifications]);
+
+  // Sinkronisasi antar instance hook (mis. AppShell + NotificationBell + ChatInbox)
+  // agar badge "Pesan" ikut hilang begitu notifikasi ditandai sudah dibaca.
+  useEffect(() => {
+    const handler = () => {
+      void fetchNotifications();
+    };
+    window.addEventListener(REFRESH_EVENT, handler);
+    return () => window.removeEventListener(REFRESH_EVENT, handler);
   }, [fetchNotifications]);
 
   const subscribe = useCallback(() => {
     if (!userId || channelRef.current) return;
 
     channelRef.current = supabase
-      .channel(`notifications:${userId}`)
+      .channel(`notifications:${userId}:${instanceIdRef.current}`)
       .on(
         "postgres_changes",
         {
@@ -69,7 +113,6 @@ export function useNotifications(userId: string | null): UseNotificationsReturn 
           // Toast notifikasi real-time saat ada notifikasi baru
           const title = newNotif.title;
           const message = newNotif.message;
-          // eslint-disable-next-line no-console
           console.log("New notification:", title, message);
         },
       )
@@ -96,6 +139,7 @@ export function useNotifications(userId: string | null): UseNotificationsReturn 
       .eq("user_id", userId);
     if (error) throw error;
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    window.dispatchEvent(new CustomEvent(REFRESH_EVENT));
   }, [userId, supabase]);
 
   const markAllAsRead = useCallback(async () => {

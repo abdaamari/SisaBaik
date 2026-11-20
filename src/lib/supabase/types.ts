@@ -120,6 +120,9 @@ export type Database = {
         Row: {
           id: string;
           role: 'provider' | 'partner' | 'admin';
+          username: string | null;
+          full_name: string | null;
+          avatar_url: string | null;
           organization_name: string;
           organization_type: string | null;
           phone: string | null;
@@ -131,6 +134,9 @@ export type Database = {
         Insert: {
           id: string;
           role: 'provider' | 'partner' | 'admin';
+          username?: string | null;
+          full_name?: string | null;
+          avatar_url?: string | null;
           organization_name: string;
           organization_type?: string | null;
           phone?: string | null;
@@ -142,6 +148,9 @@ export type Database = {
         Update: {
           id?: string;
           role?: 'provider' | 'partner' | 'admin';
+          username?: string | null;
+          full_name?: string | null;
+          avatar_url?: string | null;
           organization_name?: string;
           organization_type?: string | null;
           phone?: string | null;
@@ -372,6 +381,56 @@ export type Database = {
           }
         ];
       };
+      chat_threads: {
+        Row: {
+          id: string;
+          kind: 'donation' | 'provider_admin' | 'partner_admin';
+          donation_id: string | null;
+          provider_id: string | null;
+          partner_id: string | null;
+          requester_id: string | null;
+          subject: string;
+          last_message_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          kind: 'donation' | 'provider_admin' | 'partner_admin';
+          donation_id?: string | null;
+          provider_id?: string | null;
+          partner_id?: string | null;
+          requester_id?: string | null;
+          subject: string;
+          last_message_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          kind?: 'donation' | 'provider_admin' | 'partner_admin';
+          donation_id?: string | null;
+          provider_id?: string | null;
+          partner_id?: string | null;
+          requester_id?: string | null;
+          subject?: string;
+          last_message_at?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          { foreignKeyName: 'chat_threads_donation_id_fkey'; columns: ['donation_id']; isOneToOne: false; referencedTable: 'donations'; referencedColumns: ['id'] },
+          { foreignKeyName: 'chat_threads_provider_id_fkey'; columns: ['provider_id']; isOneToOne: false; referencedTable: 'profiles'; referencedColumns: ['id'] },
+          { foreignKeyName: 'chat_threads_partner_id_fkey'; columns: ['partner_id']; isOneToOne: false; referencedTable: 'profiles'; referencedColumns: ['id'] },
+          { foreignKeyName: 'chat_threads_requester_id_fkey'; columns: ['requester_id']; isOneToOne: false; referencedTable: 'profiles'; referencedColumns: ['id'] }
+        ];
+      };
+      chat_messages: {
+        Row: { id: string; thread_id: string; sender_id: string; body: string; created_at: string };
+        Insert: { id?: string; thread_id: string; sender_id: string; body: string; created_at?: string };
+        Update: { id?: string; thread_id?: string; sender_id?: string; body?: string; created_at?: string };
+        Relationships: [
+          { foreignKeyName: 'chat_messages_thread_id_fkey'; columns: ['thread_id']; isOneToOne: false; referencedTable: 'chat_threads'; referencedColumns: ['id'] },
+          { foreignKeyName: 'chat_messages_sender_id_fkey'; columns: ['sender_id']; isOneToOne: false; referencedTable: 'profiles'; referencedColumns: ['id'] }
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -435,6 +494,9 @@ export type Database = {
         };
         _Returns: void;
       };
+      get_or_create_donation_chat: { _Args: { p_donation_id: string }; _Returns: string };
+      get_or_create_support_chat: { _Args: Record<string, never>; _Returns: string };
+      send_chat_message: { _Args: { p_thread_id: string; p_body: string }; _Returns: string };
     };
     Enums: {
       [_ in never]: never;

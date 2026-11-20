@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { CheckCircle, Coins, Hand, Package, Plus, TrendingUp, XCircle } from "lucide-react";
+import { CheckCircle, Coins, Hand, MessageCircle, Package, Plus, TrendingUp, XCircle } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { DonationRow } from "@/components/ui/donation-row";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -141,10 +141,16 @@ export default function ProviderDashboard() {
         title="Beranda"
         description="Ringkasan donasi Anda. Pilih salah satu angka untuk melihat daftarnya."
         action={
-          <Link href="/provider/donations/new" className={buttonVariants({ size: "lg" })}>
-            <Plus aria-hidden="true" />
-            Buat donasi
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/provider/messages" className={buttonVariants({ variant: "outline", size: "lg" })}>
+              <MessageCircle aria-hidden="true" />
+              Chat Admin / Mitra
+            </Link>
+            <Link href="/provider/donations/new" className={buttonVariants({ size: "lg" })}>
+              <Plus aria-hidden="true" />
+              Buat donasi
+            </Link>
+          </div>
         }
         className="mb-0"
       />
