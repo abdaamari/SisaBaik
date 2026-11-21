@@ -2,7 +2,9 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, MessageCircle, Send } from "lucide-react";
+import { ArrowLeft, Loader2, MessageCircle, Send, Smile } from "lucide-react";
+import { ChatAvatar, profileName, type ChatProfile } from "@/components/chat/chat-avatar";
+import { useChatTyping } from "@/hooks/use-chat-typing";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -51,6 +53,7 @@ function ChatInboxContent({ role }: { role: ChatRole }) {
   const requestedDonationId = searchParams.get("donation");
   const supabase = useMemo(() => createClient(), []);
   const [threads, setThreads] = useState<ChatThread[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, ChatProfile>>({});
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -111,6 +114,10 @@ function ChatInboxContent({ role }: { role: ChatRole }) {
         ...donationThreads,
       ].sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
       setThreads(allThreads);
+      const { data: displayProfiles } = await supabase.rpc("get_chat_profiles", {} as never);
+      if (Array.isArray(displayProfiles)) {
+        setProfiles(Object.fromEntries((displayProfiles as ChatProfile[]).map(p => [p.id, p])));
+      }
 
       const requested = requestedThreadId
         ? allThreads.find((thread) => thread.id === requestedThreadId)
@@ -215,11 +222,16 @@ function ChatInboxContent({ role }: { role: ChatRole }) {
                       activeThreadId === thread.id && "bg-secondary/70",
                     )}
                   >
+                    <span className="flex items-center gap-3">
+                      <ChatAvatar profile={profiles[otherParticipant(thread, userId, profiles)]} label={thread.kind === "donation" ? thread.subject : "Admin SisaBaik"} />
+                      <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold text-foreground">{thread.subject}</span>
                     <span className="mt-1 block text-xs text-muted-foreground">
                       {thread.kind === "donation" ? "Chat donasi" : "Chat bantuan Admin"}
                       <span aria-hidden="true"> · </span>
                       {formatChatTime(thread.last_message_at)}
+                    </span>
+                      </span>
                     </span>
                   </button>
                 </li>
@@ -235,6 +247,7 @@ function ChatInboxContent({ role }: { role: ChatRole }) {
               thread={activeThread}
               role={role}
               userId={userId}
+              profiles={profiles}
               unreadSince={unreadSinceByThread[activeThread.id] ?? null}
               onBack={() => setActiveThreadId(null)}
             />
@@ -255,16 +268,22 @@ function ChatConversation({
   userId,
   unreadSince,
   onBack,
+  profiles,
 }: {
   thread: ChatThread;
   role: ChatRole;
   userId: string;
   unreadSince: string | null;
   onBack: () => void;
+  profiles: Record<string, ChatProfile>;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { typing, update: updateTyping, stop: stopTyping } = useChatTyping(thread.id, userId);
+  const counterpart = profiles[otherParticipant(thread, userId, profiles)];
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [liveDividerId, setLiveDividerId] = useState<string | null>(null);
@@ -350,6 +369,8 @@ function ChatConversation({
     const body = draft.trim();
     if (!body || isSending) return;
     setIsSending(true);
+    stopTyping();
+    setEmojiOpen(false);
 
     // Optimistic: tampilkan pesan sendiri langsung di kanan.
     const optimisticId = `optimistic-${Date.now()}`;
@@ -386,6 +407,7 @@ function ChatConversation({
 
   const senderLabel = (message: ChatMessage) => {
     if (message.sender_id.toLowerCase() === userId.toLowerCase()) return "Anda";
+    if (profiles[message.sender_id]) return profileName(profiles[message.sender_id]);
     if (thread.kind === "donation") return role === "provider" ? "Mitra penyalur" : "Penyedia makanan";
     return role === "admin" ? "Pengguna" : "Admin Sisabaik";
   };
@@ -409,9 +431,7 @@ function ChatConversation({
         <Button type="button" variant="ghost" size="icon-sm" className="md:hidden" onClick={onBack} aria-label="Kembali ke daftar percakapan">
           <ArrowLeft aria-hidden="true" />
         </Button>
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-fresh-soft text-fresh-ink">
-          <MessageCircle className="size-4" aria-hidden="true" />
-        </div>
+        <ChatAvatar profile={counterpart} label={thread.kind === "donation" ? thread.subject : "Admin SisaBaik"} />
         <div className="min-w-0">
           <h2 className="truncate text-sm font-bold text-foreground">{thread.subject}</h2>
           <p className="text-xs text-muted-foreground">{thread.kind === "donation" ? "Percakapan privat donasi" : "Percakapan privat dengan Admin"}</p>
@@ -441,7 +461,8 @@ function ChatConversation({
                   <span className="h-px flex-1 bg-border" aria-hidden="true" />
                 </div>
               )}
-              <div className={cn("flex", shouldAlignRight ? "justify-end" : "justify-start")}>
+              <div className={cn("flex items-end gap-2", shouldAlignRight ? "justify-end" : "justify-start")}>
+                {!mine && <ChatAvatar profile={profiles[message.sender_id]} label={senderLabel(message)} />}
                 <article className={cn("max-w-[min(85%,38rem)] rounded-2xl px-4 py-3", shouldAlignRight ? "rounded-br-md bg-primary text-primary-foreground" : "rounded-bl-md bg-muted text-foreground")}>
                   <p className={cn("mb-1 text-[11px] font-semibold", shouldAlignRight ? "text-primary-foreground/75" : "text-muted-foreground")}>{senderLabel(message)}</p>
                   <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.body}</p>
@@ -456,10 +477,39 @@ function ChatConversation({
         <div ref={bottomRef} />
       </div>
 
+      <div className="h-7 shrink-0 px-4 text-xs text-muted-foreground sm:px-6" role="status" aria-live="polite">
+        {typing && <span className="inline-flex items-center gap-2">
+          Sedang mengetik
+          <span className="inline-flex gap-1" aria-hidden="true">
+            {[0, 1, 2].map(i => <span key={i} className="size-1 rounded-full bg-current motion-safe:animate-pulse" style={{ animationDelay: `${i * 180}ms` }} />)}
+          </span>
+        </span>}
+      </div>
+      {emojiOpen && <div id={`emoji-${thread.id}`} className="flex shrink-0 flex-wrap gap-1 border-t border-border px-4 py-2" role="group" aria-label="Pilih emoji">
+        {["😊", "😀", "😂", "❤️", "👍", "🙏", "🎉", "🤝", "🍱", "🍞", "🚚", "📍", "✅", "👋", "🥰", "😅"].map(emoji =>
+          <button key={emoji} type="button" aria-label={`Tambahkan ${emoji}`} className="size-10 rounded-lg text-xl hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
+            onClick={() => {
+              const input = inputRef.current;
+              const start = input?.selectionStart ?? draft.length;
+              const end = input?.selectionEnd ?? start;
+              const next = draft.slice(0, start) + emoji + draft.slice(end);
+              if (next.length > 2000) return;
+              setDraft(next);
+              updateTyping(next);
+              input?.focus();
+              requestAnimationFrame(() => input?.setSelectionRange(start + emoji.length, start + emoji.length));
+            }}>{emoji}</button>)}
+      </div>}
       <form onSubmit={sendMessage} className="flex shrink-0 items-end gap-3 border-t border-border bg-card p-4 sm:px-6">
+        <Button type="button" variant="ghost" size="icon-lg" disabled={isSending} aria-label="Pilih emoji" aria-expanded={emojiOpen} aria-controls={`emoji-${thread.id}`} onClick={() => setEmojiOpen(open => !open)}>
+          <Smile aria-hidden="true" />
+        </Button>
         <Input
+          ref={inputRef}
           value={draft}
-          onChange={(event) => setDraft(event.target.value.slice(0, 2000))}
+          onChange={(event) => { const value = event.target.value.slice(0, 2000); setDraft(value); updateTyping(value); }}
+          onBlur={stopTyping}
+          onKeyDown={event => { if (event.key === "Escape") setEmojiOpen(false); }}
           placeholder="Tulis pesan…"
           aria-label="Tulis pesan"
           autoComplete="off"
@@ -473,6 +523,11 @@ function ChatConversation({
       <p className="shrink-0 bg-card px-4 pb-3 text-center text-[11px] text-muted-foreground sm:px-6">Pesan dilindungi akses privat berbasis akun.</p>
     </div>
   );
+}
+
+function otherParticipant(thread: ChatThread, userId: string | null, profiles: Record<string, ChatProfile>) {
+  if (thread.kind === "donation") return (thread.provider_id === userId ? thread.partner_id : thread.provider_id) ?? "";
+  return thread.requester_id !== userId ? thread.requester_id ?? "" : Object.values(profiles).find(p => p.role === "admin")?.id ?? "";
 }
 
 function formatChatTime(value: string) {
